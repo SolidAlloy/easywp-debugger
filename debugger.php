@@ -19,6 +19,8 @@ session_start();
     !!! Constants section !!!
 */
 
+define('VERSION', '1.1');
+
 define('PASSWORD', 'notsoeasywp');
 
 define('ERRORS', [0 => 'No error',
@@ -1364,6 +1366,45 @@ function processArchiveRequest() {
 }
 
 
+function getVersionUrl() {
+    $url = 'https://github.com/SolidAlloy/easywp-debugger/releases/latest';
+    $ch = curl_init();
+    $timeout = 10;
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+
+    $html = curl_exec($ch);
+    
+    if(curl_errno($ch)) {
+        curl_close($ch);
+        return false;
+    }
+    
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if($httpCode == 200) {
+        $redirectedUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        curl_close($ch);
+        return $redirectedUrl;
+    } else {
+        curl_close($ch);
+        return false;
+    }
+}
+
+
+function checkNewVersion() {
+    $url = getVersionUrl();
+    if ($url) {
+        $gitHubVersion = substr($url, strrpos($url, '/') + 1);
+        return version_compare($gitHubVersion, VERSION, '>');
+    } else {
+        throw new Exception('Failed to fetch new version');
+    }
+}
+
+
 /*
     !!! POST request processors section !!! 
 */
@@ -1537,6 +1578,26 @@ if (authorized()) {
                                  )));
         }
     }
+
+    if (isset($_POST['checkVersion'])) {
+        try {
+            if (checkNewVersion()) {
+                $success = true;
+                $new = true;
+            } else {
+                $success = true;
+                $new = false;
+            }
+        } catch (Exception $e) {
+            $success = false;
+            $new = false;
+        }
+
+        die(json_encode(array('success' => $success,
+                              'new' => $new,
+                             )));
+    }
+
 }  // end of "if(authorized())"
 
 ?>
@@ -1572,7 +1633,7 @@ var printMsg = function(msg, scroll, color, small) {
     if (small) {
         liString = '<li class="list-group-item '+color+'" style="height: 30px; padding-top: 0px; padding-bottom: 0px;"><small>'+msg+'</small></li>';
     } else {
-        liString = '<li class="list-group-item '+color+'">'+msg+'</li>';
+        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px;">'+msg+'</li>';
     }
 
     $('#progress-log').append(liString);
@@ -1683,6 +1744,13 @@ var getArchiveName = function() {
 
     archiveName = "wp-files-"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
     return archiveName;
+};
+
+var setMaxheight = function(){
+    var progressLog = $("#progress-log");
+    var winHeight = $(window).height();
+    winHeight -= 350;
+    progressLog.css({'max-height' : winHeight + "px"});
 };
 
 </script>
@@ -1958,6 +2026,33 @@ var sendSelfDestructRequest = function() {
         }
     });
 };
+
+
+var sendVersionCheckRequest = function() {
+    $.ajax({
+        type: "POST",
+        timeout: 20000,
+        data: {checkVersion: 'submit'},
+        success: function(response) {
+            var jsonData = JSON.parse(response);
+            if (!$.trim(jsonData)){
+                $("#version-fail").removeClass('d-none').addClass('show');
+            }
+            if (jsonData.success) {
+                if (jsonData.new) {
+                    $("#version-new").removeClass('d-none').addClass('show');
+                } else {
+                    // do nothing if GitHub version is equal or lower
+                }
+            } else {
+                $("#version-fail").removeClass('d-none').addClass('show');
+            }
+        },
+        error: function (jqXHR, exception) {
+            $("#version-fail").removeClass('d-none').addClass('show');
+        }
+    });
+}
 
 
 /**
@@ -2281,7 +2376,31 @@ var processArchiveForm = function(form) {
 
 $(document).ready(function() {
 
+    setMaxheight();
+
+    $(window).resize(function(){
+        setMaxheight();
+    });
+
     $('#archive-name').attr('placeholder', getArchiveName());
+
+    $("#folder-archive").on("input", function(){
+        $("#archive-name").attr('placeholder', $(this).val()+'.zip');
+    });
+
+    sendVersionCheckRequest();
+
+    $('#extract-form').submit(function(form) {
+        processExtractForm(form);
+    });
+
+    $('#archive-form').submit(function(form) {
+        processArchiveForm(form);
+    });
+    
+    $('#view-form').submit(function(form) {
+        processViewForm(form);
+    });
 
     $("#btnFlush").click(function() {
         sendFlushRequest();
@@ -2299,10 +2418,6 @@ $(document).ready(function() {
         sendReplaceRequest($(this));
     });
     
-    $("#btnActivate").click(function() {
-        sendActivateRequest($(this));
-    });
-    
     $("#btnAdminerOn").click(function() {
         sendAdminerOnRequest();
     });
@@ -2310,6 +2425,10 @@ $(document).ready(function() {
     $("#btnAdminerOff").click(function() {
         sendAdminerOffRequest();
     });
+
+    $("#btnActivate").click(function() {
+        sendActivateRequest($(this));
+    });    
 
     $("#btnFixFilesystem").click(function() {
         sendFixFilesystemRequest($(this));
@@ -2323,17 +2442,6 @@ $(document).ready(function() {
         sendSelfDestructRequest();
     });
 
-    $('#extract-form').submit(function(form) {
-        processExtractForm(form);
-    });
-    
-    $('#view-form').submit(function(form) {
-        processViewForm(form);
-    });
-
-    $('#archive-form').submit(function(form) {
-        processArchiveForm(form);
-    });
 });
 
 </script>
@@ -2390,25 +2498,33 @@ $(document).ready(function() {
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
 
 <style>
+
+    .container-fluid {
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 50px;
+        padding-right: 50px;
+        padding-top: 20px;
+    }
+
     .progress-log{
         margin-bottom: 10px;
-        max-height: 550px;
         overflow-x: hidden;
         overflow-y: scroll;
         -webkit-overflow-scrolling: touch;
     }
 
     .bg-info-custom{
-        background-color: #b0f4e6;
+        background-color: #bee5eb;
     }
     .bg-warning-custom{
-        background-color: #efca8c;
+        background-color: #ffeeba;
     }
     .bg-danger-custom{
-        background-color: #f17e7e;
+        background-color: #f5c6cb;
     }
     .bg-success-custom{
-        background-color: #a9eca2;
+        background-color: #c3e6cb;
     }
     
     .scrollbar-secondary::-webkit-scrollbar {
@@ -2444,6 +2560,12 @@ $(document).ready(function() {
         border-top-left-radius: 3px;
     }
 
+    .version-notification {
+        bottom: 70px;
+        position: fixed;
+        right: 50px;
+    }
+
 </style>
 
 
@@ -2454,7 +2576,7 @@ $(document).ready(function() {
     <?php if (authorized()): ?>
         <title>Debugger</title>
     <?php else: ?>
-            <title>Debugger Login</title>
+        <title>Debugger Login</title>
     <?php endif; ?>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2463,110 +2585,144 @@ $(document).ready(function() {
 
 <?php if (authorized()): ?>
 <body>
-    <div class="container mt-5">
-        <div class="row justify-content-start">
-            <div class="col-sm-2">
-                <button type="button" class="btn btn-info" id="btnFlush">Flush Cache</button>
+    <div class="container-fluid h-100">
+        <div class="row">
+            <div class="col-6">
+                
+                <div class="row">
+                    <form id="extract-form">
+                        <div class="form-group input-group mb-0">
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
+                            </div>
+                            <input type="text" class="form-control" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip">
+
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info ml-3">To</div>
+                            </div>
+                            <input type="text" class="form-control" id="dest-dir" name="dest-dir" placeholder="destination/folder">
+                            <span class="input-group-btn ml-3">
+                                <button type="submit" class="btn btn-secondary" id="btnExtract">Submit</button>
+                            </span>
+                        </div>
+                        <small id="dest-dir-help" class="form-text text-muted mb-1" style="margin-left: 425px;">Website root directory by default.</small>
+                    </form>
+                </div>
+
+                <div class="row mt-2">
+                    <form id="archive-form">
+                        <div class="form-group input-group">
+
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">Compress</div>
+                            </div>
+                            <input type="text" class="form-control" id="folder-archive" name="folder-archive" placeholder="root-directory" style="width: 200px;">
+
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info ml-3">To</div>
+                            </div>
+                            <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 255px;">
+                            <span class="input-group-btn ml-3">
+                                <button type="submit" class="btn btn-secondary" id="btnArchive">Submit</button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="row mt-4">
+                    <form id="view-form">
+                        <div class="form-group input-group">
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">View content of a ZIP archive</div>
+                            </div>
+                            <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip">
+                            <span class="input-group-btn ml-3">
+                                <button type="submit" class="btn btn-secondary" id="btnView">Submit</button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+
             </div>
-            <div class="col-sm">
-                <div class="btn-group" role="group" aria-label="Debug Group">
-                    <button type="button" class="btn btn-success" id="btnDebugOn">Enable Debug</button>
-                    <button type="button" class="btn btn-warning" id="btnDebugOff">Disable Debug</button>
+
+            <div class="col-6 justify-content-start">
+
+                <div class="row">
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnFlush">Flush Cache</button>
+                    </div>
+                    <div class="col-5">
+                        <div class="btn-group" role="group" aria-label="Debug Group">
+                            <button type="button" class="btn btn-success" id="btnDebugOn">Enable Debug</button>
+                            <button type="button" class="btn btn-warning" id="btnDebugOff">Disable Debug</button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnReplace">Replace Default Files</button>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-8">
+                        <div class="btn-group" role="group" aria-label="Adminer Group">
+                            <button type="button" class="btn btn-success" id="btnAdminerOn">Enable Adminer</button>
+                            <button type="button" class="btn btn-secondary" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
+                            <button type="button" class="btn btn-warning" id="btnAdminerOff">Disable Adminer</button>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnActivate">Activate Clean 2019 Theme</button>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnFixFilesystem">Fix FileSystem</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnFixPlugin">Fix EasyWP Plugin</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-danger" id="btnSelfDestruct">Remove File From Server</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="row d-flex justify-content-center">
+            <div class="col-8">
+                <div class="progress mt-3 d-none" style="height: 23px;" id="progress-container"></div>
+            </div>
+        </div>
+    
+        <div class="row mt-3 d-flex justify-content-center">
+            <div class="col-8">
+                <div class="panel panel-primary" id="result-panel">
+                    <div class="panel-heading"><h3 class="panel-title">Progress Log</h3>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
+                        </ul>
+                    </div>
                 </div>
             </div>
-            <div class="col-sm">
-                <button type="button" class="btn btn-info" id="btnReplace">Replace Default Files</button>
-            </div>
-            <div class="col-sm">
-                <button type="button" class="btn btn-info" id="btnActivate">Activate Clean 2019 Theme</button>
-            </div>
-        </div>
-        <div class="row justify-content-start mt-4">
-            <div class="col-5">
-                <div class="btn-group" role="group" aria-label="Adminer Group">
-                    <button type="button" class="btn btn-success" id="btnAdminerOn">Enable Adminer</button>
-                    <button type="button" class="btn btn-secondary" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
-                    <button type="button" class="btn btn-warning" id="btnAdminerOff">Disable Adminer</button>
-                </div>
-            </div>
-            <div class="col-2">
-                <button type="button" class="btn btn-info" id="btnFixFilesystem">Fix FileSystem</button>
-            </div>
-            <div class="col-sm">
-                <button type="button" class="btn btn-info" id="btnFixPlugin">Fix EasyWP Plugin</button>
-            </div>
-            <div class="col-sm">
-                <button type="button" class="btn btn-danger" id="btnSelfDestruct">Remove File From Server</button>
-            </div>
-        </div>
-        <div class="row justify-content-start mt-4" style="margin-left: 0%;">
-            <form id="extract-form">
-                <div class="form-group input-group mb-0">
-
-                    <div class="input-group-prepend">
-                        <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
-                    </div>
-                    <input type="text" class="form-control" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip">
-
-                    <div class="input-group-prepend">
-                        <div class="input-group-text input-group-text-info ml-3">To</div>
-                    </div>
-                    <input type="text" class="form-control" id="dest-dir" name="dest-dir" placeholder="destination/folder">
-                    <span class="input-group-btn ml-3">
-                        <button type="submit" class="btn btn-secondary" id="btnExtract">Submit</button>
-                    </span>
-                </div>
-                <small id="dest-dir-help" class="form-text text-muted mb-1" style="margin-left: 425px;">Website root directory by default.</small>
-            </form>
-
-        </div>
-        <div class="row justify-content-start mt-2" style="margin-left: 0%;">
-            <form id="view-form">
-                <div class="form-group input-group">
-                    <div class="input-group-prepend">
-                        <div class="input-group-text input-group-text-info">View content of a ZIP archive</div>
-                    </div>
-                    <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip">
-                    <span class="input-group-btn ml-3">
-                        <button type="submit" class="btn btn-secondary" id="btnView">Submit</button>
-                    </span>
-                </div>
-            </form>
         </div>
 
-        <div class="row justify-content-start mt-3" style="margin-left: 0%;">
-            <form id="archive-form">
-                <div class="form-group input-group mb-0">
+    </div>
 
-                    <div class="input-group-prepend">
-                        <div class="input-group-text input-group-text-info">Compress</div>
-                    </div>
-                    <input type="text" class="form-control" id="folder-archive" name="folder-archive" placeholder="wp-content">
+    <div class="alert alert-success alert-dismissible fade d-none version-notification" id="version-new" role="alert">
+      <strong>New version is out!</strong> <br> Check it <a href="https://collab.namecheap.net/display/~artyomperepelitsa/EasyWP+Debugger" class="text-info">here</a>
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
 
-                    <div class="input-group-prepend">
-                        <div class="input-group-text input-group-text-info ml-3">To</div>
-                    </div>
-                    <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 160px;">
-                    <span class="input-group-btn ml-3">
-                        <button type="submit" class="btn btn-secondary" id="btnArchive">Submit</button>
-                    </span>
-                </div>
-            </form>
-        </div>
-
-        <!-- progress bar on the third row -->
-        <div class="progress mt-3 d-none" style="height: 23px;" id="progress-container">
-        </div>
-
-        <!-- progress log on the fourth row -->
-        <div class="panel panel-primary mt-4" id="result-panel">
-            <div class="panel-heading"><h3 class="panel-title">Progress Log</h3>
-            </div>
-            <div class="panel-body">
-                <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
-                </ul>
-            </div>
-        </div>
+    <div class="alert alert-danger alert-dismissible fade d-none version-notification" id="version-fail" role="alert">
+      <strong>Failed to check new version</strong>
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
     </div>
 </body>
 <?php else: ?>
