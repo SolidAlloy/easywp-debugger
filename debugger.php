@@ -48,6 +48,9 @@ define('ERRORS', [0 => 'No error',
                  28 => 'Not a zip archive']);
 
 define('DS', DIRECTORY_SEPARATOR);
+// these two are required for the zip archivation to save the list of all directories and files inside a certain directory
+define('DIRS', 'dirs.txt');
+define('FILES', 'files.txt');
 
 /*
     !!! PHP classes section !!!
@@ -671,6 +674,113 @@ class VarnishCache
 }
 
 
+class FileCounter
+{
+    protected $sizeLimit = 52428800;  // 50 MB
+    protected $ignoreList;
+    protected $directory;
+
+    public function __construct()
+    {
+        $selfName = basename(__FILE__);
+        $this->ignoreList = array('.','..', $selfName);
+        $this->dirs = fopen(DIRS, 'a');
+        $this->files = fopen(FILES, 'a');
+    }
+
+    public function __destruct()
+    {
+        fclose($this->dirs);
+        fclose($this->files);
+    }
+
+    public function countFiles($directory, $silent=false)
+    {
+        $number = 0;
+        $entries = scandir($directory);
+        if ($entries === false && !$silent) {
+            throw new Exception("No Such Directory");
+        }
+        foreach($entries as $entry) {
+            if(in_array($entry, $this->ignoreList)) {
+                continue;
+            }
+            if (is_dir(rtrim($directory, '/') . '/' . $entry)) {
+                fwrite($this->dirs, $directory.'/'.$entry."\n");
+                ++$number;
+                $number += $this->countFiles(rtrim($directory, '/') . '/' . $entry, $silent=true);
+            } else {
+                if (filesize($directory.'/'.$entry) < $this->sizeLimit) {
+                    fwrite($this->files, $directory.'/'.$entry."\n");
+                    ++$number;
+                }
+            }
+        }
+        return $number;
+    }
+}
+
+
+class DirZipArchive
+{
+    protected $startNum;
+    protected $zip;
+    protected $counter = 0;
+    protected $sizeLimit = 52428800;  // 50 MB
+    protected $totalSize = 0;
+    protected $dirs;
+    protected $files;
+
+    public function __construct($archiveName, $startNum = 0)
+    {
+        $this->zip = new ZipArchive();
+        $status = $this->zip->open($archiveName, ZIPARCHIVE::CREATE);
+
+        if (gettype($this->zip) == 'integer') {  // if error upon opening the archive ...
+            $error = ERRORS[$zip];
+            throw new Exception($error);  // throw it within an exception
+        }
+
+        $this->startNum = $startNum;
+        $this->dirs = fopen(DIRS, 'r');
+        $this->files = fopen(FILES, 'r');
+    }
+
+    public function addDirs() {
+        while(!feof($this->dirs))  {
+            ++$this->counter;
+            $this->totalSize += 4098;
+            $directory = rtrim(fgets($this->dirs));
+            $this->zip->addEmptyDir($directory);
+        }
+    }
+
+    public function addFilesChunk()
+    {
+        while(!feof($this->files))  {
+            $file = rtrim(fgets($this->files), "\n");
+            if (($this->startNum > ++$this->counter) or !$file) {
+                continue;
+            }
+            $this->totalSize += filesize($file);
+
+            if ($this->totalSize > $this->sizeLimit) {
+                return $this->counter;
+            }
+            $this->zip->addFile($file, $file);
+        }
+        return true;
+    }
+
+    public function __destruct()
+    {
+        fclose($this->dirs);
+        fclose($this->files);
+        $this->zip->close();
+    }
+}
+
+
 /*
     !!! PHP functions section !!!
 */
@@ -1187,6 +1297,73 @@ function viewArchivePost($archiveName)
 }
 
 
+function checkArchive($archiveName)
+{
+    if (file_exists($archiveName)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+
+function processPreCheckRequest() {
+    try {
+        $numberSuccess = 1;
+        $counter = new FileCounter();
+        $number = $counter->countFiles($_POST['directory']);
+        $numberError = '';
+    } catch (Exception $e) {
+        unlink(DIRS);
+        unlink(FILES);
+        $numberSuccess = true;
+        $number = 0;
+        $numberError = $e->getMessage();
+    }
+
+    if (checkArchive($_POST['archive'])) {
+        $checkArchiveSuccess = true;
+    } else {
+        $checkArchiveSuccess = false;
+    }
+    return json_encode(array('numberSuccess' => $numberSuccess ,
+                             'number' => $number ,
+                             'numberError' => $numberError ,
+                             'checkArchiveSuccess' => $checkArchiveSuccess ,
+                            ));
+}
+
+
+function processArchiveRequest() {
+    if (isset($_POST['startNum']) && !empty($_POST['startNum'])) {
+        $startNum = $_POST['startNum'];
+    } else {
+        $startNum = 0;
+    }
+
+    $archive = new DirZipArchive($_POST['archiveName'], $startNum);
+
+    if ($startNum == 0) {
+        $archive->addDirs();
+    }
+    $result = $archive->addFilesChunk();
+
+    if ($result === true) {
+        unlink(DIRS);
+        unlink(FILES);
+        return json_encode(array('success' => true,
+                                 'error' => '',
+                                 'startNum' => 0,
+                                ));
+    } else {
+        return json_encode(array('success' => 0,
+                                 'error' => '',
+                                 'startNum' => $result,
+                                ));
+    }
+}
+
+
 /*
     !!! POST request processors section !!! 
 */
@@ -1341,6 +1518,25 @@ if (authorized()) {
                               'number' => $number,
                               'error' => '')));
     }
+
+    if (isset($_POST['compressPreCheck'])) {
+        $jsonResult = processPreCheckRequest();
+        die($jsonResult);
+    }
+
+    if (isset($_POST['archive'])) {
+        try {
+            $jsonResult = processArchiveRequest();
+            die($jsonResult);
+        } catch (Exception $e) {
+            unlink(DIRS);
+            unlink(FILES);
+            die(json_encode(array('success' => 0,
+                                  'error' => $e->getMessage(),
+                                  'startNum' => 0,
+                                 )));
+        }
+    }
 }  // end of "if(authorized())"
 
 ?>
@@ -1356,7 +1552,6 @@ if (authorized()) {
 
 <script src="https://code.jquery.com/jquery-3.4.0.min.js" integrity="sha256-BJeo0qm959uMBGb65z40ejJYGSgR7REI4+CW1fNKwOg=" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
 
 <?php if (authorized()): ?>
 <script>
@@ -1475,6 +1670,19 @@ var handleErrors = function (jqXHR, exception, excludeList) {
     }
 
     printMsg(msg, true, 'bg-danger-custom');
+};
+
+var getArchiveName = function() {
+    var currentDate = new Date();
+    var date = currentDate.getDate();
+    var month = currentDate.getMonth() + 1;
+    var year = currentDate.getFullYear();
+    var hour = currentDate.getHours();
+    var minute = currentDate.getMinutes();
+    var second = currentDate.getSeconds();
+
+    archiveName = "wp-files-"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
+    return archiveName;
 };
 
 </script>
@@ -1666,7 +1874,6 @@ var sendAdminerOffRequest = function() {
             handleEmptyResponse($("btnAdminerOff"), jsonData);
             if (jsonData.success == "1") {
                 printMsg('Adminer Disabled Successfully!', true, 'bg-success-custom');
-                Cookies.remove('adminer');
             } else {
                 printMsg('Adminer Disabling Failed!', true, 'bg-warning-custom');
             }
@@ -1964,7 +2171,117 @@ var processViewForm = function(form) {
 };
 
 
+/**
+ * [sendArchiveRequest sends a request to archive ZIP archive and processes the response]
+ * @param  {string} archiveName  [path to zip file]
+ * @param  {string} destDir      [destination directory]
+ * @param  {integer} maxArchiveTime [maximum time to process archiveion]
+ * @param  {integer} totalNum     [total number of files in archive]
+ * @param  {integer} startNum     [number of file to start archiveing from]
+ * @return {null}
+ */
+var sendArchiveRequest = function(archiveName, totalNum, startNum) {
+    // default parameters
+    startNum = startNum || 0;
+
+    $.ajax({
+        type: "POST",
+        data: {archive: 'submit',
+               archiveName: archiveName,
+               startNum: startNum},
+
+        success: function(response) {
+            var jsonData = JSON.parse(response);
+            
+            handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
+                
+            if (jsonData.success) {  // if success, show the success button and message
+                $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
+                $('#btnArchive').prop("disabled", false);
+                $('#btnArchive').html(defaultDoneText);
+                printMsg('Archive created successfully!', true, 'bg-success-custom');
+            }
+            
+            // if the compression didn't complete in one turn, start from the last file
+            else if (jsonData.startNum) {
+                percentage = (jsonData.startNum/totalNum*100).toFixed() + '%';
+                $('#progress-bar').text(percentage).width(percentage);
+                // if the compression didn't complete but another file appeared to be the last one, continue the next iteration from it (of if there were no starting files before)
+                startNum = jsonData.startNum;
+                sendArchiveRequest(archiveName, totalNum, startNum);
+            } else {  // if complete fail, show returned error
+                $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
+                $('#btnArchive').html(defaultFailText);
+                $('#btnArchive').prop("disabled", false);
+                printMsg('An error happened upon creating the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+            }
+        },
+        error: function (jqXHR, exception) {
+            handleErrors(jqXHR, exception); // handle errors except for 0 and 503
+            $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
+            $('#btnArchive').html(defaultFailText);
+            $('#btnArchive').prop("disabled", false);
+        }
+    });
+};
+
+
+var processArchiveForm = function(form) {
+    // preparations
+    form.preventDefault();
+    var directory = $("#archive-form :input[name='folder-archive']")[0].value;
+    if (!directory) {
+        directory = '.';
+    }
+    var archiveName = $("#archive-form :input[name='archive-name']")[0].value;
+    if (!archiveName) {
+        if (directory == '.') {
+            archiveName = getArchiveName();
+        } else {
+            archiveName = directory.substring(directory.lastIndexOf("/")) + '.zip';  // directory name (without parent directories) + .zip
+        }
+    }
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Compressing...';
+    $('#btnArchive').prop("disabled", true);
+    $('#btnArchive').html(loadingText);
+    printMsg('Starting Compression...', true, 'bg-info-custom');
+
+    // send request to get total number of files in directory
+    var compressPreCheck = $.ajax({
+        type: "POST",
+        data: {compressPreCheck: 'submit',
+               directory: directory,
+               archive: archiveName}
+    })
+    .done(function( response ) {
+        var jsonData = JSON.parse(response);
+        
+        handleEmptyResponse($('btnArchive'), jsonData, defaultFailText);
+            
+        if (jsonData.numberSuccess && jsonData.checkArchiveSuccess) {
+            $("#progress-container").removeClass('d-none').addClass('show').html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
+            sendArchiveRequest(archiveName, jsonData.number);
+        } else {
+            $('#btnArchive').html(defaultFailText);
+            $('#btnArchive').prop("disabled", false);
+            if (!jsonData.numberSuccess) {
+                printMsg('An error happened upon compressing the directory: <strong>'+jsonData.numberError+'</strong>', true, 'bg-danger-custom');
+            }
+            if (!jsonData.checkArchiveSuccess) {
+                printMsg('An error happened upon compressing the directory: <strong>'+archiveName+' already exists</strong>', true, 'bg-danger-custom');
+            }
+        }
+    })
+    .fail(function( jqXHR, exception ) {
+        handleErrors(jqXHR, exception);
+        $('#btnArchive').html(defaultFailText);
+        $('#btnArchive').prop("disabled", false);
+    });
+};
+
 $(document).ready(function() {
+
+    $('#archive-name').attr('placeholder', getArchiveName());
 
     $("#btnFlush").click(function() {
         sendFlushRequest();
@@ -2014,6 +2331,9 @@ $(document).ready(function() {
         processViewForm(form);
     });
 
+    $('#archive-form').submit(function(form) {
+        processArchiveForm(form);
+    });
 });
 
 </script>
@@ -2209,6 +2529,26 @@ $(document).ready(function() {
                     <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip">
                     <span class="input-group-btn ml-3">
                         <button type="submit" class="btn btn-secondary" id="btnView">Submit</button>
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <div class="row justify-content-start mt-3" style="margin-left: 0%;">
+            <form id="archive-form">
+                <div class="form-group input-group mb-0">
+
+                    <div class="input-group-prepend">
+                        <div class="input-group-text input-group-text-info">Compress</div>
+                    </div>
+                    <input type="text" class="form-control" id="folder-archive" name="folder-archive" placeholder="wp-content">
+
+                    <div class="input-group-prepend">
+                        <div class="input-group-text input-group-text-info ml-3">To</div>
+                    </div>
+                    <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 160px;">
+                    <span class="input-group-btn ml-3">
+                        <button type="submit" class="btn btn-secondary" id="btnArchive">Submit</button>
                     </span>
                 </div>
             </form>
