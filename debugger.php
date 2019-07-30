@@ -855,7 +855,8 @@ function flushOPcache()
 }
 
 
-function flushRedis() {
+function flushRedis()
+{
     $wp_object_cache = new WP_Object_Cache();
     return $wp_object_cache->flush();
 }
@@ -864,7 +865,8 @@ function flushRedis() {
  * [clearAll clears OPcache, Redis, and Varnish caches]
  * @return array [success of purging and errors if any]
  */
-function clearAll() {
+function clearAll()
+{
     $redis_success = flushRedis() ? 1 : 0;
 
     $varnish_cache = new VarnishCache();
@@ -883,7 +885,8 @@ function clearAll() {
  * [wpConfigClear removes display_errors and debug mode if found in wp-config.php]
  * @return boolean [success of removing debug from wp-config.php]
  */
-function wpConfigClear() {
+function wpConfigClear()
+{
     $wp_config = "wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
@@ -900,7 +903,8 @@ function wpConfigClear() {
  * [wpConfigPut enables debug and display_errors in wp-config.php]
  * @return boolean [success of enabling debug]
  */
-function wpConfigPut() {
+function wpConfigPut()
+{
     $wp_config = "wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
@@ -935,7 +939,7 @@ function rmove($src, $dst)
 }
 
 /**
- * [rrmdir remove folders and files recursively]
+ * [rrmdir removes folders and files recursively]
  * @param  string $dir [directory where files must be removed]
  * @return null
  */
@@ -945,10 +949,10 @@ function rrmdir($dir)
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object != "." && $object != "..") {
-                if (is_dir($dir."/".$object)) {
-                    rrmdir($dir."/".$object);
+                if (is_dir($dir.DS.$object)) {
+                    rrmdir($dir.DS.$object);
                 } else {
-                    unlink($dir."/".$object);
+                    unlink($dir.DS.$object);
                 }
             }
         }
@@ -1006,7 +1010,8 @@ function replaceDefaultFiles()
  * @param  string $themeName  [theme name]
  * @return boolean            [theme exists]
  */
-function themeExists($themesPath, $themeName) {
+function themeExists($themesPath, $themeName)
+{
     $themes = scandir($themesPath);
     if (in_array($themeName, $themes)) {
         return true;
@@ -1230,7 +1235,8 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
  * @param  string $archiveName [path to zip file]
  * @return array              [pathnames of files inside an archive]
  */
-function viewArchive($archiveName) {
+function viewArchive($archiveName)
+{
     $archive = zip_open($archiveName);
     if (gettype($archive) == 'integer') {  // if error upon opening the archive ...
         $error = ERRORS[$archive];
@@ -1244,14 +1250,18 @@ function viewArchive($archiveName) {
     return $files;
 }
 
-
+/**
+ * [checkDestDir checks if a directory exists and is writable. If no, it creates the directory]
+ * @param  [type] $destDir [description]
+ * @return [type]          [description]
+ */
 function checkDestDir($destDir)
 {
     if (file_exists($destDir)) {
         if (is_writable($destDir)) {
             return true;
         } else {
-            return false;
+            return false;  // if the directory is not writable, no need to try to create it
         }
     } else {
         $createSuccess = mkdir($destDir, 0755, true);  // create directory recursively
@@ -1265,7 +1275,7 @@ function checkDestDir($destDir)
 
 /**
  * [countFiles returns number of files and folders inside an archive]
- * @param  string $archiveName [path to zip file]
+ * @param  string $archiveName  [path to zip file]
  * @return integer              [number of files in zip file]
  */
 function countFiles($archiveName)
@@ -1338,7 +1348,11 @@ function viewArchivePost($archiveName)
                           'error' => '')));
 }
 
-
+/**
+ * [checkArchive checks if the archive the user wants to create already exists]
+ * @param  string $archiveName [archive name]
+ * @return boolean             [returns true if such a name is free]
+ */
 function checkArchive($archiveName)
 {
     if (file_exists($archiveName)) {
@@ -1348,17 +1362,21 @@ function checkArchive($archiveName)
     }
 }
 
-
-function processPreCheckRequest() {
+/**
+ * [processPreCheckRequest checks if the directory can be compressed and returns json with the result]
+ * @return string [json-encoded array with the result of pre-check]
+ */
+function processPreCheckRequest()
+{
     try {
-        $numberSuccess = 1;
+        $numberSuccess = true;
         $counter = new FileCounter();
-        $number = $counter->countFiles($_POST['directory']);
+        $number = $counter->countFiles($_POST['directory']);  // try counting files
         $numberError = '';
     } catch (Exception $e) {
-        unlink(DIRS);
+        unlink(DIRS);  // remove temporary files in case of fail
         unlink(FILES);
-        $numberSuccess = true;
+        $numberSuccess = false;
         $number = 0;
         $numberError = $e->getMessage();
     }
@@ -1375,8 +1393,13 @@ function processPreCheckRequest() {
                             ));
 }
 
-
-function processArchiveRequest() {
+/**
+ * [processArchiveRequest compresses the directory using input from the POST form and returns
+ *  a json-encoded array with the result]
+ * @return string [json-encoded result]
+ */
+function processArchiveRequest()
+{
     if (isset($_POST['startNum']) && !empty($_POST['startNum'])) {
         $startNum = $_POST['startNum'];
     } else {
@@ -1391,7 +1414,7 @@ function processArchiveRequest() {
     $result = $archive->addFilesChunk();
 
     if ($result === true) {
-        unlink(DIRS);
+        unlink(DIRS);  // remove temporary files because they are not needed anymore
         unlink(FILES);
         return json_encode(array('success' => true,
                                  'error' => '',
@@ -1400,22 +1423,26 @@ function processArchiveRequest() {
     } else {
         return json_encode(array('success' => 0,
                                  'error' => '',
-                                 'startNum' => $result,
+                                 'startNum' => $result,  // return the number of file on which the compression stopped
                                 ));
     }
 }
 
-
-function getVersionUrl() {
+/**
+ * [getVersionUrl retrieves a link to the last version of Debugger from GitHub]
+ * @return string [link to the latest GitHub release of Debugger]
+ */
+function getVersionUrl()
+{
     $url = 'https://github.com/SolidAlloy/easywp-debugger/releases/latest';
     $ch = curl_init();
     $timeout = 10;
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);  // the "/releases/latest" link will redirect to a link like "/releases/tag/1.0"
     curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
 
-    $html = curl_exec($ch);
+    curl_exec($ch);
 
     if(curl_errno($ch)) {
         curl_close($ch);
@@ -1424,7 +1451,7 @@ function getVersionUrl() {
 
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     if($httpCode == 200) {
-        $redirectedUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $redirectedUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);  // the "/releases/latest" link will redirect to a link like "/releases/tag/1.0"
         curl_close($ch);
         return $redirectedUrl;
     } else {
@@ -1433,11 +1460,15 @@ function getVersionUrl() {
     }
 }
 
-
-function checkNewVersion() {
+/**
+ * [checkNewVersion checks if there is a new version of Debugger on GitHub]
+ * @return bool ["true" if the version on GitHub is higher than the local one]
+ */
+function checkNewVersion()
+{
     $url = getVersionUrl();
     if ($url) {
-        $gitHubVersion = substr($url, strrpos($url, '/') + 1);
+        $gitHubVersion = substr($url, strrpos($url, '/') + 1);  // get "1.0" from a link like "/releases/tag/1.0"
         return version_compare($gitHubVersion, VERSION, '>');
     } else {
         throw new Exception('Failed to fetch new version');
@@ -1450,6 +1481,7 @@ function checkNewVersion() {
 */
 
 
+/* creates session and print success if the password matches */
 if (isset($_POST['login'])) {
     if (passwordMatch($_POST['password'])) {
         $_SESSION['debugger'] = true;
@@ -1463,35 +1495,37 @@ if (isset($_POST['login'])) {
     }
 }
 
+// if the Debugger session is created, process POST requests
 if (authorized()) {
+
+    /* flushes Varnish, Redis, and opcache caches */
     if (isset($_POST['flush'])) {
-        /* flushes Varnish, Redis, and opcache caches */
         $results = clearAll();
         echo json_encode($results);
         exit;
     }
 
+    /* enables errors on-screen */
     if (isset($_POST['debugOn'])) {
-        /* enables errors on-screen */
         $debug_result = wpConfigPut() ? 1 : 0;
         die(json_encode(array('debug_on_success' => $debug_result)));
     }
 
+    /* disables on-screen errors */
     if (isset($_POST['debugOff'])) {
-        /* disables on-screen errors */
         $debug_result = wpConfigClear() ? 1 : 0;
         die(json_encode(array('debug_off_success' => $debug_result)));
     }
 
+    /* replaces WordPress default files (latest version of WordPress) */
     if (isset($_POST['replace'])) {
-        /* replaces WordPress default files (latest version of WordPress) */
         $result = replaceDefaultFiles() ? 1 : 0;
         echo json_encode(array('replace_success' => $result));
         exit;
     }
 
+    /* uploads latest version of the 2019 theme and activates it */
     if (isset($_POST['activate'])) {
-        /* uploads latest version of the 2019 theme and activates it */
         $errors = array();
 
         try {
@@ -1518,16 +1552,16 @@ if (authorized()) {
         exit;
     }
 
+    /* fixes the EasyWP plugin if its files are not fully present on the website */
     if (isset($_POST['fixPlugin'])) {
-        /* fixes the EasyWP plugin if its files are not fully present on the website */
         $symLink = createEasyWpSymLink() ? 1 : 0;
         $objectCache = createObjectCache() ? 1 : 0;
         echo json_encode(array('symLink' => $symLink, 'objectCache' => $objectCache));
         exit();
     }
 
+    /* removes debugger.php and additional files from the server, disables debug */
     if (isset($_POST['selfDestruct'])) {
-        /* removes debugger.php and additional files from the server, disables debug */
         session_destroy();
         $files = array('wp-admin/adminer-auto.php',
                        'wp-admin/adminer.php',
@@ -1543,14 +1577,15 @@ if (authorized()) {
         die(json_encode(array('success' => 1)));
     }
 
+    /* fix filesystem not being able to find some files by running stat() on all files */
     if (isset($_POST['fixFileSystem'])) {
         statAllFiles('/var/www/wptbox');
         echo json_encode(array('success' => 1));
         exit();
     }
 
+    /* uploads adminer-auto files and sets the cookie to access Adminer */
     if (isset($_POST['adminerOn'])) {
-        /* uploads adminer-auto files and sets the cookie to access Adminer */
         if (uploadAdminerFiles()) {
             $_SESSION['debugger_adminer'] = true;
             die(json_encode(array('success' => 1)));
@@ -1559,8 +1594,8 @@ if (authorized()) {
         }
     }
 
+    /* removes adminer-auto files and unsets the cookie */
     if (isset($_POST['adminerOff'])) {
-        /* removes adminer-auto files and unsets the cookie */
         unlink('wp-admin/adminer-auto.php');
         unlink('wp-admin/adminer.php');
         unlink('wp-admin/adminer.css');
@@ -1568,25 +1603,28 @@ if (authorized()) {
         die(json_encode(array('success' => 1)));
     }
 
+    /* prints success=true if the destination directory of extraction exists or has been successfully created */
     if (isset($_POST['checkDestDir'])) {
         $destDir = $_POST['destDir'];
         if (checkDestDir($destDir)) {
-            die(json_encode(array('success' => 1)));
+            die(json_encode(array('success' => true)));
         } else {
-            die(json_encode(array('success' => 0)));
+            die(json_encode(array('success' => false)));
         }
     }
 
+    /* if something needs to be done with an archive */
     if (isset($_POST['archiveName']) && isset($_POST['action'])) {
         $archiveName = $_POST['archiveName'];
         
-        if ($_POST['action'] == 'extract') {
+        if ($_POST['action'] == 'extract') {  // extract archive
             unzipArchivePost($archiveName);
-        } elseif ($_POST['action'] == 'view') {
+        } elseif ($_POST['action'] == 'view') {  // show content of archive
             viewArchivePost($archiveName);
         }
     }
 
+    /* counts files and directories in a directory and returns their total number */
     if (isset($_POST['filesNumber'])) {
         try {
             $number = countFiles($_POST['filesNumber']);
@@ -1600,17 +1638,19 @@ if (authorized()) {
                               'error' => '')));
     }
 
+    /* checks if the archive name is free and if the source directory exists */
     if (isset($_POST['compressPreCheck'])) {
         $jsonResult = processPreCheckRequest();
         die($jsonResult);
     }
 
+    /* compresses the directory */
     if (isset($_POST['archive'])) {
         try {
             $jsonResult = processArchiveRequest();
             die($jsonResult);
         } catch (Exception $e) {
-            unlink(DIRS);
+            unlink(DIRS);  //
             unlink(FILES);
             die(json_encode(array('success' => 0,
                                   'error' => $e->getMessage(),
@@ -1638,7 +1678,7 @@ if (authorized()) {
                              )));
     }
 
-}  // end of "if(authorized())"
+}  // end of "if( authorized() )"
 
 ?>
  
@@ -2103,7 +2143,7 @@ var sendVersionCheckRequest = function() {
             $("#version-fail").removeClass('d-none').addClass('show');
         }
     });
-}
+};
 
 
 /**
