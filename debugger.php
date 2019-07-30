@@ -50,9 +50,11 @@ define('ERRORS', [0 => 'No error',
                  28 => 'Not a zip archive']);
 
 define('DS', DIRECTORY_SEPARATOR);
+
 // these two are required for the zip archivation to save the list of all directories and files inside a certain directory
 define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
+
 
 /*
     !!! PHP classes section !!!
@@ -233,8 +235,8 @@ class WP_Object_Cache
                         && is_link('/var/www/wptbox/wp-content/mu-plugins')) {
                             // pass
                     } else {
-                        $target_pointer = "../../easywp-plugin/mu-plugins"; 
-                        $link_name = '/var/www/wptbox/wp-content/mu-plugins'; 
+                        $target_pointer = "../../easywp-plugin/mu-plugins";
+                        $link_name = '/var/www/wptbox/wp-content/mu-plugins';
                         symlink($target_pointer, $link_name);
                     }
                     $predis = $plugin_dir . '/wp-nc-easywp/plugin/Http/Redis/includes/predis.php';
@@ -314,8 +316,8 @@ class WP_Object_Cache
     /**
      * Invalidate all items in the cache.
      *
-     * @param int $delay Number of seconds to wait before invalidating the items.
-     * @return  bool            Returns TRUE on success or FALSE on failure.
+     * @param   int $delay Number of seconds to wait before invalidating the items.
+     * @return  bool       Returns TRUE on success or FALSE on failure.
      */
     public function flush($delay = 0)
     {
@@ -342,7 +344,7 @@ class WP_Object_Cache
     /**
      * Convert Redis responses into something meaningful
      *
-     * @param mixed $response
+     * @param  mixed $response
      * @return mixed
      */
     protected function parse_redis_response($response)
@@ -368,87 +370,92 @@ class WP_Object_Cache
  * retrieves values required for flushing Varnish cache, and other values.
  */
 class DBconn {
-	// Regexes to find DB details in wp-config.php
-    private $patterns = array('/DB_NAME\', \'(.*)\'/',
+    // Regexes to find DB details in wp-config.php
+    protected $patterns = array('/DB_NAME\', \'(.*)\'/',
                               '/DB_USER\', \'(.*)\'/',
                               '/DB_PASSWORD\', \'(.*)\'/',
                               '/DB_HOST\', \'(.*)\'/',
                               '/table_prefix = \'(.*)\'/');
-	private $db_details = array();
+    protected $db_details = array();
     public $errors = array();
-	public $connected = false;
-	private $mysqlConn;
-	
-    public function __construct() {
+    public $connected = false;
+    protected $mysqlConn;
+
+    public function __construct()
+    {
         $this->db_details = $this->get_db_login();  // get db details from wp-config.php
         if (!$this->db_details) {  // in case of fail, return empty instance (with $connected = fail)
-			return;
-		}
+            return;
+        }
         $this->mysqlConn = new mysqli($this->db_details['host'],
-									  $this->db_details['user'],
-									  $this->db_details['pass'],
-									  $this->db_details['name']);
+                                      $this->db_details['user'],
+                                      $this->db_details['pass'],
+                                      $this->db_details['name']);
         if ($this->mysqlConn->connect_errno) {
             array_push($this->errors, "Database connection failed: " . $mysqli->connect_error);
         } else {
             $this->connected = true;
         }
-	}
-	
-	public function __destruct() {
-		if ($this->connected) {
-			$this->mysqlConn->close();
-		}
-	}
-    
+    }
+
+    public function __destruct()
+    {
+        if ($this->connected) {
+            $this->mysqlConn->close();
+        }
+    }
+
     /**
      * [getVarnishDetails gets values necessary to build Varnish purge request]
-     * @return [array] [Varnish parameters]
+     * @return array [Varnish parameters]
      */
-	public function getVarnishDetails() {
-		$failedAnswer = array('schema'=> false, 'x_purge_method'=>false, 'varnishIp'=>false);
-		if (!$this->connected) {
-			return $failedAnswer;
-		}
+    public function getVarnishDetails()
+    {
+        $failedAnswer = array('schema'=> false, 'x_purge_method'=>false, 'varnishIp'=>false);
+        if (!$this->connected) {
+            return $failedAnswer;
+        }
         $varnish_query = "SELECT * FROM `".$this->db_details['prefix']."options` WHERE `option_name` LIKE 'easywp_plugin_slug'";
         $result = $this->mysqlConn->query($varnish_query);
         $row = $result->fetch_array(MYSQLI_NUM);
         if ($row) {
             $db_data = json_decode($row[2]);
-			return array(
+            return array(
                            'schema'=> $db_data->varnish->schema ,
-						   'x_purge_method'=> $db_data->varnish->default_purge_method ,
-						   'varnishIp'=> $db_data->varnish->ip ,
+                           'x_purge_method'=> $db_data->varnish->default_purge_method ,
+                           'varnishIp'=> $db_data->varnish->ip ,
                         );
         } else {
-			return $failedAnswer;
+            return $failedAnswer;
         }
-	}
-    
+    }
+
     /**
      * [getHomeUrl is a replacement for home_url() function needed for the VarnishCache class]
-     * @return [string] [WordPress home URL]
+     * @return string [WordPress home URL]
      */
-	public function getHomeUrl() {
-		
-		if (!$this->connected) {
-			return '';
-		}
+    public function getHomeUrl()
+    {
+
+        if (!$this->connected) {
+            return '';
+        }
         $home_query = "SELECT * FROM `" . $this->db_details['prefix'] . "options` WHERE `option_name` LIKE 'home'";
         $result = $this->mysqlConn->query($home_query);
         $row = $result->fetch_array(MYSQLI_NUM);
         if ($row) {
             return $row[2];
         } else {
-			return '';
+            return '';
         }
     }
-    
+
     /**
      * [get_db_login returns an array of db login details and db prefix]
-     * @return [array] [DB details]
+     * @return array [DB details]
      */
-    private function get_db_login() {
+    private function get_db_login()
+    {
         $db_details = array(
                               'name'   => '' ,
                               'user'   => '' ,
@@ -465,43 +472,44 @@ class DBconn {
 
         $last = end($this->patterns);  // get last element to know where the end of the array
         $pattern = reset($this->patterns);  // return to the first regex
-        
-		// Fill $db_details array with values from wp-config.php
+
+        // Fill $db_details array with values from wp-config.php
         while(!feof($wp_config)) {
-        	$line = fgets($wp_config);
-        	preg_match($pattern, $line, $matches);  // check each line of wp-config.php
-        	if ($matches) {  // and when the match is found
-        	    $key = key($db_details);
-        		$db_details[$key] =  $matches[1];  // add the found detail to the current key of the array
-        		next($db_details);  // switch to next key of the array
-        		if ($pattern == $last) {
-        			break;
-        		} else {
-        		$pattern = next($this->patterns);  // once one detail is found, start searching with the next regex
-        		}
-        	}
+            $line = fgets($wp_config);
+            preg_match($pattern, $line, $matches);  // check each line of wp-config.php
+            if ($matches) {  // and when the match is found
+                $key = key($db_details);
+                $db_details[$key] =  $matches[1];  // add the found detail to the current key of the array
+                next($db_details);  // switch to next key of the array
+                if ($pattern == $last) {
+                    break;
+                } else {
+                $pattern = next($this->patterns);  // once one detail is found, start searching with the next regex
+                }
+            }
         }
         fclose($wp_config);
         return $db_details;
     }
-	
+
     /**
      * [activateTheme sets a WordPress theme in the database]
-     * @param  [string] $theme [name of the theme]
-     * @return [boolean]        [success of the activation]
+     * @param  string $theme [name of the theme]
+     * @return boolean       [success of the activation]
      */
-	public function activateTheme($theme) {
-		if (!$this->connected) {
-			return false;
-		}
+    public function activateTheme($theme)
+    {
+        if (!$this->connected) {
+            return false;
+        }
         $act_theme_query = "UPDATE `" . $this->db_details['prefix'] . "options` SET option_value = '" . $theme . "' WHERE `option_name` = 'template' or `option_name` = 'stylesheet'";
         $result = $this->mysqlConn->query($act_theme_query);
-		if ($result) {
-			return true;
-		} else {
-			return false;
-		}
-	}
+        if ($result) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
 
 /**
@@ -513,73 +521,80 @@ class VarnishCache
 {
     private $dbConn;  // DBdata class instance
     public $errors = array();
-	private $tried_localhost = false;
+    private $tried_localhost = false;
     
-    public function __construct () {
+    public function __construct ()
+    {
         $this->dbConn = new DBconn;
         if ($this->dbConn->errors) {
             $this->errors = array_merge($this->errors, $this->dbConn->errors);
         }
     }
-    
+
     /**
      * [getServiceName returns name of the cluster pod]
-     * @return [string] [name of the cluster pod]
+     * @return string [name of the cluster pod]
      */
-    private function getServiceName() {
-    	$frontend_svc = getenv('SERVICE_NAME');
-    	if($frontend_svc) {
-    		// 'wordpress-frontend.easywp.svc.cluster.local'
-    		return $frontend_svc;
-    	}
-    	$podname = getenv('HOSTNAME');
-    	if ($podname) {
-    		$regex = '/-([^-]+)-/m';
-    		$res   = preg_match_all($regex, $podname, $matches, PREG_SET_ORDER, 0);
-    
-    		if ($res) {
-    			$id = $matches[0][1];
-    			return "svc-{$id}.default.svc.cluster.local";
-    		}
-    	}
-    	return '';
+    private function getServiceName()
+    {
+        $frontend_svc = getenv('SERVICE_NAME');
+        if($frontend_svc) {
+            // 'wordpress-frontend.easywp.svc.cluster.local'
+            return $frontend_svc;
+        }
+        $podname = getenv('HOSTNAME');
+        if ($podname) {
+            $regex = '/-([^-]+)-/m';
+            $res   = preg_match_all($regex, $podname, $matches, PREG_SET_ORDER, 0);
+
+            if ($res) {
+                $id = $matches[0][1];
+                return "svc-{$id}.default.svc.cluster.local";
+            }
+        }
+        return '';
     }
 
     /**
      * [collectMultipleReplicas returns hosts to purge Varnish cache from]
-     * @return [array] [hosts to purge Varnish cache from]
+     * @return array [hosts to purge Varnish cache from]
      */
-    private function collectMultipleReplicas(): array {
-    	$svc = $this->getServiceName();
-    	if ($svc) {
-    		$ips = gethostbynamel($svc);
-    		return array_map(function ($ip) {
-    			return "http://{$ip}";
-    		}, $ips);
-    	}
-		$home_url = $this->dbConn->getHomeUrl();
-		if ($home_url) {
-			return [$home_url];
-		} else {
-			array_push($this->errors, "Failed to fetch data from wp_options.home");
-			return array();
-		}
+    private function collectMultipleReplicas(): array
+    {
+        $svc = $this->getServiceName();
+        if ($svc) {
+            $ips = gethostbynamel($svc);
+            return array_map(function ($ip) {
+                return "http://{$ip}";
+            }, $ips);
+        }
+        $home_url = $this->dbConn->getHomeUrl();
+        if ($home_url) {
+            return [$home_url];
+        } else {
+            array_push($this->errors, "Failed to fetch data from wp_options.home");
+            return array();
+        }
     }
-    
+
     /**
      * [purgeUrl send request to a host to purge Varnish cache from it]
-     * @param  [string] $url [host to purge Varnish cache from]
-     * @return [boolean]      [success of the purge request]
+     * @param  string $url    [the host to purge Varnish cache from]
+     * @param  string $schema ["http://" or "https://"]
+     * @return boolean        [success of the purge request]
      */
-    private function purgeUrl ($url) {
+    private function purgeUrl ($url, $schema=null)
+    {
         try {
             $parsedUrl = parse_url($url);
-			$dbData = $this->dbConn->getVarnishDetails();
-			if(!$dbData['schema']) {
-				array_push($this->errors, "Failed to fetch data from wp_options.easywp_plugin_slug");
-			}
+            $dbData = $this->dbConn->getVarnishDetails();
+            if(!$dbData['schema']) {
+                array_push($this->errors, "Failed to fetch data from wp_options.easywp_plugin_slug");
+            }
             // get the schema
-            $schema = $dbData['schema'] ?: 'http://';
+            if (!$schema) {
+                $schema = $dbData['schema'] ?: 'http://';
+            }
         
             // get default purge method
             $x_purge_method = $dbData['x_purge_method'] ?: 'default';
@@ -617,68 +632,77 @@ class VarnishCache
         
             // final url
             $urlToPurge = "{$schema}{$host}{$path}{$regex}";
-        	
-			// send PURGE request and check the response
-        	$ch = curl_init();
-        	$timeout = 10;
-        	curl_setopt($ch,CURLOPT_URL,$urlToPurge);
-        	curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
-        	curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
-        	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PURGE");
-        	$data = curl_exec($ch);
+            
+            // send PURGE request and check the response
+            $ch = curl_init();
+            $timeout = 10;
+            curl_setopt($ch,CURLOPT_URL,$urlToPurge);
+            curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+            curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PURGE");
+            $data = curl_exec($ch);
         
-        	if(curl_errno($ch)) {
-        		array_push($this->errors, 'Varnish - Curl error: ' . curl_error($ch));
-        	} elseif (strpos($data, 'Full cache cleared') !== false) {
-        		$result = true;
-        	} else {
-				$res = preg_match("/<title>(.*)<\/title>/siU", $data, $title_matches);
-				if ($res) {
-					$title = preg_replace('/\s+/', ' ', $title_matches[1]);
-					$title = trim($title);
-					// if purging Varnish at third-party IP didn't help, try purging localhost
-					if ($title == '405 This IP is not allowed to send BAN/PURGE requests.' && $this->tried_localhost == false) {
-						$this->tried_localhost = true;
-						return $this->purgeUrl('127.0.0.1');
-					} else {
-						array_push($this->errors, 'Varnish - ' . $title);
-					}
-				} else {
-					$result = false;
-				}
-        	}
-        	curl_close($ch);
-        	return $result;
+            if(curl_errno($ch)) {
+                // sometimes, https scheme in the database is incorrect and purge fails because of it
+                if (strpos(curl_error($ch), 'port 443: Connection refused')) {
+                    return $this->purgeUrl($url, 'http://');
+                } else {
+                    array_push($this->errors, 'Varnish - Curl error: ' . curl_error($ch));
+                }
+            } elseif (strpos($data, 'Full cache cleared') !== false) {
+                $result = true;
+            } else {
+                $res = preg_match("/<title>(.*)<\/title>/siU", $data, $title_matches);
+                if ($res) {
+                    $title = preg_replace('/\s+/', ' ', $title_matches[1]);
+                    $title = trim($title);
+                    // if purging Varnish at third-party IP didn't help, try purging localhost
+                    if ($title == '405 This IP is not allowed to send BAN/PURGE requests.' && $this->tried_localhost == false) {
+                        $this->tried_localhost = true;
+                        return $this->purgeUrl('127.0.0.1');
+                    } else {
+                        array_push($this->errors, 'Varnish - ' . $title);
+                    }
+                } else {
+                    $result = false;
+                }
+            }
+            curl_close($ch);
+            return $result;
         } catch (Exception $e) {
             array_push($this->errors, $e);
             return false;
         }
     }
-    
-    public function clearAll() {
-		/*
-		Purges all Varnish caches of the website and returns an array
-		of true/false for each Varnish URL
-		*/
+
+    /**
+     * [clearAll Purges all Varnish caches of the website and returns an array 
+     * of true/false for each Varnish URL]
+     * @return null
+     */
+    public function clearAll()
+    {
         $results = array();
         $urls = $this->collectMultipleReplicas();
-    	foreach ($urls as $url) {
-    	    $result = $this->purgeUrl($url);
+        foreach ($urls as $url) {
+            $result = $this->purgeUrl($url);
             if ($result) {
-    			array_push($results, true);
-    		} else {
-    		    array_push($results, false);
+                array_push($results, true);
+            } else {
+                array_push($results, false);
             }
         }
         return $results;
     }
 }
 
-
+/**
+ * FileCounter counts files and directories in a directory and puts the list of them in TXT files
+ */
 class FileCounter
 {
-    protected $sizeLimit = 52428800;  // 50 MB
+    protected const SIZE_LIMIT = 52428800;  // 50 MB
     protected $ignoreList;
     protected $directory;
 
@@ -686,8 +710,8 @@ class FileCounter
     {
         $selfName = basename(__FILE__);
         $this->ignoreList = array('.','..', $selfName);
-        $this->dirs = fopen(DIRS, 'a');
-        $this->files = fopen(FILES, 'a');
+        $this->dirs = fopen(DIRS, 'a');  // dirs.txt
+        $this->files = fopen(FILES, 'a');  // files.txt
     }
 
     public function __destruct()
@@ -696,6 +720,12 @@ class FileCounter
         fclose($this->files);
     }
 
+    /**
+     * [countFiles puts the list of files and directories inside certain directory in a TXT files and returns the total number of files and directories]
+     * @param  string  $directory [path to the directory where files need to be counted]
+     * @param  boolean $silent    [do not throw Exception if silent]
+     * @return integer            [number of files and directories]
+     */
     public function countFiles($directory, $silent=false)
     {
         $number = 0;
@@ -712,7 +742,7 @@ class FileCounter
                 ++$number;
                 $number += $this->countFiles(rtrim($directory, '/') . '/' . $entry, $silent=true);
             } else {
-                if (filesize($directory.'/'.$entry) < $this->sizeLimit) {
+                if (filesize($directory.'/'.$entry) < self::SIZE_LIMIT) {
                     fwrite($this->files, $directory.'/'.$entry."\n");
                     ++$number;
                 }
@@ -722,13 +752,15 @@ class FileCounter
     }
 }
 
-
+/**
+ * DirZipArchive compresses files into a zip archive until the size limit is reached
+ */
 class DirZipArchive
 {
     protected $startNum;
     protected $zip;
     protected $counter = 0;
-    protected $sizeLimit = 52428800;  // 50 MB
+    protected const SIZE_LIMIT = 52428800;  // 50 MB
     protected $totalSize = 0;
     protected $dirs;
     protected $files;
@@ -748,7 +780,11 @@ class DirZipArchive
         $this->files = fopen(FILES, 'r');
     }
 
-    public function addDirs() {
+    /**
+     * [addDirs adds directories from dirs.txt to the archive]
+     */
+    public function addDirs()
+    {
         while(!feof($this->dirs))  {
             ++$this->counter;
             $this->totalSize += 4098;
@@ -757,16 +793,19 @@ class DirZipArchive
         }
     }
 
+    /**
+     * [addFilesChunk adds files from files.txt to the archive until the size limit is reached]
+     */
     public function addFilesChunk()
     {
         while(!feof($this->files))  {
             $file = rtrim(fgets($this->files), "\n");
-            if (($this->startNum > ++$this->counter) or !$file) {
+            if (($this->startNum > ++$this->counter) or !$file) {  // skip all files below startNum and increment counter
                 continue;
             }
             $this->totalSize += filesize($file);
 
-            if ($this->totalSize > $this->sizeLimit) {
+            if ($this->totalSize > self::SIZE_LIMIT) {
                 return $this->counter;
             }
             $this->zip->addFile($file, $file);
@@ -786,6 +825,7 @@ class DirZipArchive
 /*
     !!! PHP functions section !!!
 */
+
 
 function authorized()
 {
@@ -809,9 +849,9 @@ function passwordMatch($password)
 
 function flushOPcache()
 {
-	if (function_exists('opcache_reset')) {
-		opcache_reset();
-	}
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+    }
 }
 
 
@@ -821,61 +861,61 @@ function flushRedis() {
 }
 
 /**
- * [clearAll clear OPcache, Redis, and Varnish caches]
- * @return [array] [success of purging and errors if any]
+ * [clearAll clears OPcache, Redis, and Varnish caches]
+ * @return array [success of purging and errors if any]
  */
 function clearAll() {
     $redis_success = flushRedis() ? 1 : 0;
 
     $varnish_cache = new VarnishCache();
     $varnish_results = $varnish_cache->clearAll();
-	// Set to false if any element of array is false, otherwise true
-	$varnish_success = in_array(false, $varnish_results, true) ? 0 : 1;
+    // Set to false if any element of array is false, otherwise true
+    $varnish_success = in_array(false, $varnish_results, true) ? 0 : 1;
 
-	flushOPcache();
+    flushOPcache();
 
-	return array('redis_success' => $redis_success,
-	             'varnish_success' => $varnish_success,
-	             'errors' => $varnish_cache->errors);
+    return array('redis_success' => $redis_success,
+                 'varnish_success' => $varnish_success,
+                 'errors' => $varnish_cache->errors);
 }
 
 /**
  * [wpConfigClear removes display_errors and debug mode if found in wp-config.php]
- * @return [boolean] [success of removing debug from wp-config.php]
+ * @return boolean [success of removing debug from wp-config.php]
  */
 function wpConfigClear() {
-	$wp_config = "wp-config.php";
-	if (!is_writable($wp_config) or !is_readable($wp_config)) {
-		return false;
-	}
+    $wp_config = "wp-config.php";
+    if (!is_writable($wp_config) or !is_readable($wp_config)) {
+        return false;
+    }
     $config = file_get_contents($wp_config);
     $config = str_replace("define('WP_DEBUG', true);", '', $config);
     $config = str_replace("define('WP_DEBUG_DISPLAY', true);", '', $config);
     $config = str_replace("@ini_set('display_errors', 1);", '', $config);
     file_put_contents($wp_config, $config);
-	return true;
+    return true;
 }
 
 /**
  * [wpConfigPut enables debug and display_errors in wp-config.php]
- * @return [boolean] [success of enabling debug]
+ * @return boolean [success of enabling debug]
  */
 function wpConfigPut() {
-	$wp_config = "wp-config.php";
-	if (!is_writable($wp_config) or !is_readable($wp_config)) {
-		return false;
-	}
+    $wp_config = "wp-config.php";
+    if (!is_writable($wp_config) or !is_readable($wp_config)) {
+        return false;
+    }
     $config = file_get_contents($wp_config);
     $config = preg_replace("/\/\* That's all, stop editing! Happy blogging\. \*\//i", "define('WP_DEBUG', true);\ndefine('WP_DEBUG_DISPLAY', true);\n@ini_set('display_errors', 1);\n/* That's all, stop editing! Happy blogging. */", $config);
     file_put_contents ($wp_config, $config);
-	return true;
+    return true;
 }
 
 /**
  * [rmove moves folders and files recursively]
- * @param  [string] $src [object to move]
- * @param  [string] $dst [destination folder]
- * @return [null]
+ * @param  string $src [object to move]
+ * @param  string $dst [destination folder]
+ * @return null
  */
 function rmove($src, $dst)
 {
@@ -896,47 +936,47 @@ function rmove($src, $dst)
 
 /**
  * [rrmdir remove folders and files recursively]
- * @param  [string] $dir [directory where files must be removed]
- * @return [null]
+ * @param  string $dir [directory where files must be removed]
+ * @return null
  */
 function rrmdir($dir)
 {
     if (is_dir($dir)) {
-        $objects = scandir($dir); 
+        $objects = scandir($dir);
         foreach ($objects as $object) {
-            if ($object != "." && $object != "..") { 
+            if ($object != "." && $object != "..") {
                 if (is_dir($dir."/".$object)) {
                     rrmdir($dir."/".$object);
                 } else {
                     unlink($dir."/".$object);
                 }
-            } 
+            }
         }
-    rmdir($dir); 
-    } 
+    rmdir($dir);
+    }
 }
 
 /**
  * [extractZipFromUrl uploads an archive, extracts it, and removes the zip file]
- * @param  [string] $url         [URL to download the archive from]
- * @param  [string] $path        [path to put the archive to]
- * @param  [string] $archiveName [name of the archive]
- * @return [boolean]              [success of the extraction]
+ * @param  string $url         [URL to download the archive from]
+ * @param  string $path        [path to put the archive to]
+ * @param  string $archiveName [name of the archive]
+ * @return boolean             [success of the extraction]
  */
 function extractZipFromUrl($url, $path, $archiveName)
 {
-	$archive = $path . $archiveName;
+    $archive = $path . $archiveName;
     if (!file_put_contents($archive, file_get_contents($url))) {
         return false;
     }
-	
+
     $zip = new ZipArchive();
     $x = $zip->open($archive);
     if ($x === true) {
-    	$zip->extractTo($path);
-    	$zip->close();
-		unlink($archive);
-		return true;
+        $zip->extractTo($path);
+        $zip->close();
+        unlink($archive);
+        return true;
     } else {
         unlink($archive);
         return false;
@@ -945,108 +985,108 @@ function extractZipFromUrl($url, $path, $archiveName)
 
 /**
  * [replaceDefaultFiles replaces default WordPress files with the ones from the latest version]
- * @return [boolean] [success of the replacement]
+ * @return boolean [success of the replacement]
  */
 function replaceDefaultFiles()
 {
     $url = 'http://wordpress.org/latest.zip';
     $file = 'wordpress.zip';
     if (!extractZipFromUrl($url, './', 'wordpress.zip')) {
-		return false;
-	}
-    
-    rmove('wordpress', '.'); // 'wordpress' directory is created after extracting the archive
+        return false;
+    }
+
+    rmove('wordpress', '.');  // 'wordpress' directory is created after extracting the archive
     rrmdir('wordpress');
     return true;
 }
 
 /**
  * [themeExists checks if the theme folder exists in wp-content/themes]
- * @param  [string] $themesPath [path to the themes folder]
- * @param  [string] $themeName  [theme name]
- * @return [boolean]             [theme exists]
+ * @param  string $themesPath [path to the themes folder]
+ * @param  string $themeName  [theme name]
+ * @return boolean            [theme exists]
  */
 function themeExists($themesPath, $themeName) {
-	$themes = scandir($themesPath);
-	if (in_array($themeName, $themes)) {
-		return true;
-	} else {
-		return false;
-	}
+    $themes = scandir($themesPath);
+    if (in_array($themeName, $themes)) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /**
  * [findLatest2019 gets version number of the latest 2019 theme]
- * @return [string] [version number]
+ * @return string [version number]
  */
 function findLatest2019()
 {
-	$url = 'https://themes.svn.wordpress.org/twentynineteen/';
-	$versionsPage = file_get_contents($url);
-	if (!$versionsPage) {
-	    return '';
-	}
-	$res = preg_match_all('/>([\d\.]+)\/<\/a>/', $versionsPage, $matches);
-	if ($res) {
-	    $latestVersion = end($matches[1]);
-	} else {
-	    $latestVersion = '';
-	}
-	return $latestVersion;
+    $url = 'https://themes.svn.wordpress.org/twentynineteen/';
+    $versionsPage = file_get_contents($url);
+    if (!$versionsPage) {
+        return '';
+    }
+    $res = preg_match_all('/>([\d\.]+)\/<\/a>/', $versionsPage, $matches);
+    if ($res) {
+        $latestVersion = end($matches[1]);
+    } else {
+        $latestVersion = '';
+    }
+    return $latestVersion;
 }
 
 /**
  * [replace2019 replaces files of the 2019 theme or uploads files if the folder doesn't exist]
- * @return [boo] [description]
+ * @return boolean [success of the replacement]
  */
 function replace2019()
 {
-	$themesFolderPath = 'wp-content/themes/';
-	$themeName = 'twentynineteen';
-	$themePath = $themesFolderPath . $themeName;
-	$version = findLatest2019();
-	if (!$version) {
-		throw new Exception('Failed to find the latest version of 2019');
-	}
-	if (themeExists($themesFolderPath, $themeName)) {
-		rrmdir($themePath);
-	}
-	$url = 'https://downloads.wordpress.org/theme/twentynineteen.' . $version . '.zip';
+    $themesFolderPath = 'wp-content/themes/';
+    $themeName = 'twentynineteen';
+    $themePath = $themesFolderPath . $themeName;
+    $version = findLatest2019();
+    if (!$version) {
+        throw new Exception('Failed to find the latest version of 2019');
+    }
+    if (themeExists($themesFolderPath, $themeName)) {
+        rrmdir($themePath);
+    }
+    $url = 'https://downloads.wordpress.org/theme/twentynineteen.' . $version . '.zip';
     if (extractZipFromUrl($url, $themesFolderPath, 'twentynineteen.zip')) {
-		return true;
-	} else {
+        return true;
+    } else {
         throw new Exception('Failed to upload the theme archive');
-	}
+    }
 }
 
 /**
  * [activate2019 activates the twentynineteen theme in database]
- * @return [boolean] [success of the activation]
+ * @return boolean [success of the activation]
  */
 function activate2019()
 {
-	$dbConn = new DBconn;
+    $dbConn = new DBconn;
     if ($dbConn->errors) { // if db connection failed, return errors
-		return $dbConn->errors;
-	}
-	if ($dbConn->activateTheme('twentynineteen')) {
-		return true;
-	} else {
-		return false;
-	}
+        return $dbConn->errors;
+    }
+    if ($dbConn->activateTheme('twentynineteen')) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /**
  * [createEasyWpSymLink creates the mu-plugins symlink or does nothing if the link already exists]
- * @return [boolean] [success of the symlink creation]
+ * @return boolean [success of the symlink creation]
  */
 function createEasyWpSymLink()
 {
     $target_pointer = "../../easywp-plugin/mu-plugins";
     $link_name = '/var/www/wptbox/wp-content/mu-plugins';
-	if (is_link($link_name)) {
-		return true;
-	}
+    if (is_link($link_name)) {
+        return true;
+    }
     if (symlink($target_pointer, $link_name)) {
         return true;
     } else {
@@ -1056,14 +1096,14 @@ function createEasyWpSymLink()
 
 /**
  * [createObjectCache creates object-cache.php if missing]
- * @return [boolean] [success of the file creation]
+ * @return boolean [success of the file creation]
  */
 function createObjectCache()
 {
     $filePath = 'wp-content/object-cache.php';
     $correctFileSum = '0d798e3e13049ca5f96c0a0b2b44f63211f70837';
-	$cdnObjectCache = 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401561/object-cache.php';
-    
+    $cdnObjectCache = 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401561/object-cache.php';
+
     if (file_exists($filePath)) {
         $fileSum = sha1_file($filePath);
         if ($fileSum == $correctFileSum) {
@@ -1072,7 +1112,7 @@ function createObjectCache()
             unlink($filePath);
         }
     }
-    
+
     if (file_put_contents($filePath, file_get_contents($cdnObjectCache))) {
         return true;
     } else {
@@ -1082,8 +1122,8 @@ function createObjectCache()
 
 /**
  * [statAllFiles runs stat on all files/folders in path]
- * @param  [string] $dir [path to folder]
- * @return [null]
+ * @param  string $dir [path to folder]
+ * @return null
  */
 function statAllFiles($dir)
 {
@@ -1092,44 +1132,44 @@ function statAllFiles($dir)
         $path = realpath($dir.DIRECTORY_SEPARATOR.$value);
         if(!is_dir($path)) {
             stat($path);
-			clearstatcache($path);
+            clearstatcache($path);
         } else if($value != "." && $value != "..") {
             statAllFiles($path);
             stat($path);
-			clearstatcache($path);
+            clearstatcache($path);
         }
     }
 }
 
 /**
  * [uploadAdminerFiles uploads adminer-auto files to wp-admin]
- * @return [boolean] [success of the upload]
+ * @return boolean [success of the upload]
  */
 function uploadAdminerFiles()
 {
-	$file1 = 'wp-admin/adminer-auto.php';  // custom extension file to bypass login form
-	$file2 = 'wp-admin/adminer.php';  // default Adminer (MySQL-only & English-only)
-	$file3 = 'wp-admin/adminer.css';  // Adminer Material Theme https://github.com/arcs-/Adminer-Material-Theme
-	$result1 = file_put_contents($file1, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php'));
-	$result2 = file_put_contents($file2, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php'));
-	$result3 = file_put_contents($file3, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css'));
-	if ($result1 && $result2 && $result3) {
-		return true;
-	} else {
-		unlink($file1);
-		unlink($file2);
-		unlink($file3);
-		return false;
-	}
+    $file1 = 'wp-admin/adminer-auto.php';  // custom extension file to bypass login form
+    $file2 = 'wp-admin/adminer.php';  // default Adminer (MySQL-only & English-only)
+    $file3 = 'wp-admin/adminer.css';  // Adminer Material Theme https://github.com/arcs-/Adminer-Material-Theme
+    $result1 = file_put_contents($file1, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php'));
+    $result2 = file_put_contents($file2, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php'));
+    $result3 = file_put_contents($file3, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css'));
+    if ($result1 && $result2 && $result3) {
+        return true;
+    } else {
+        unlink($file1);
+        unlink($file2);
+        unlink($file3);
+        return false;
+    }
 }
 
 /**
  * [unzipArchive extracts a zip archive in chunks. Returns true on completion and last
  *     extracted file if the allowed time is exceeded]
- * @param  [string] $archiveName [path to the zip file]
- * @param  [string] $destDir     [destination directory]
- * @param  [integer] $startNum    [filenumber to start extraction from]
- * @return [boolean|array]              [true on extraction completion; array
+ * @param  string $archiveName [path to the zip file]
+ * @param  string $destDir     [destination directory]
+ * @param  integer $startNum    [filenumber to start extraction from]
+ * @return boolean|array             [true on extraction completion; array
  *                                containing number and name of the failed file on fail]
  */
 function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
@@ -1141,14 +1181,14 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
         $error = ERRORS[$archive];
         throw new Exception($error); // throw it within an exception
     }
-    
+
     $counter = 0;
     while($entry = zip_read($archive)){
         
         if ($startNum > ++$counter) {  // skip files before startNum
             continue;
         }
-        
+
         $name = zip_entry_name($entry);
         $size = zip_entry_filesize($entry);
 
@@ -1172,7 +1212,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
                     zip_close($archive);
                     return [$counter, $name];  // return number and name of the file
                 }
-                
+
                 $chunkSize = ($size > 10240) ? 10240 : $size;
                 $size -= $chunkSize;
                 $chunk = zip_entry_read($entry, $chunkSize);
@@ -1187,8 +1227,8 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 
 /**
  * [viewArchive returns pathnames of all the files inside an archive]
- * @param  [string] $archiveName [path to zip file]
- * @return [array]              [pathnames of files inside an archive]
+ * @param  string $archiveName [path to zip file]
+ * @return array              [pathnames of files inside an archive]
  */
 function viewArchive($archiveName) {
     $archive = zip_open($archiveName);
@@ -1225,8 +1265,8 @@ function checkDestDir($destDir)
 
 /**
  * [countFiles returns number of files and folders inside an archive]
- * @param  [string] $archiveName [path to zip file]
- * @return [integer]              [number of files in zip file]
+ * @param  string $archiveName [path to zip file]
+ * @return integer              [number of files in zip file]
  */
 function countFiles($archiveName)
 {
@@ -1247,8 +1287,8 @@ function countFiles($archiveName)
 
 /**
  * [unzipArchivePost wrapper for unzipArchive that returns its result as json array]
- * @param  [string] $archiveName [path to zip file]
- * @return [null]
+ * @param  string $archiveName [path to zip file]
+ * @return null
  */
 function unzipArchivePost($archiveName)
 {
@@ -1281,8 +1321,8 @@ function unzipArchivePost($archiveName)
 
 /**
  * [viewArchivePost wrapper for viewArchive that returns its result as json array]
- * @param  [string] $archiveName [path to zip file]
- * @return [null]
+ * @param  string $archiveName [path to zip file]
+ * @return null
  */
 function viewArchivePost($archiveName)
 {
@@ -1376,12 +1416,12 @@ function getVersionUrl() {
     curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
 
     $html = curl_exec($ch);
-    
+
     if(curl_errno($ch)) {
         curl_close($ch);
         return false;
     }
-    
+
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     if($httpCode == 200) {
         $redirectedUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
@@ -1425,61 +1465,61 @@ if (isset($_POST['login'])) {
 
 if (authorized()) {
     if (isset($_POST['flush'])) {
-    	/* flushes Varnish, Redis, and opcache caches */
+        /* flushes Varnish, Redis, and opcache caches */
         $results = clearAll();
         echo json_encode($results);
         exit;
     }
 
     if (isset($_POST['debugOn'])) {
-    	/* enables errors on-screen */
+        /* enables errors on-screen */
         $debug_result = wpConfigPut() ? 1 : 0;
-    	die(json_encode(array('debug_on_success' => $debug_result)));
+        die(json_encode(array('debug_on_success' => $debug_result)));
     }
 
     if (isset($_POST['debugOff'])) {
-    	/* disables on-screen errors */
+        /* disables on-screen errors */
         $debug_result = wpConfigClear() ? 1 : 0;
         die(json_encode(array('debug_off_success' => $debug_result)));
     }
 
     if (isset($_POST['replace'])) {
-    	/* replaces WordPress default files (latest version of WordPress) */
-    	$result = replaceDefaultFiles() ? 1 : 0;
+        /* replaces WordPress default files (latest version of WordPress) */
+        $result = replaceDefaultFiles() ? 1 : 0;
         echo json_encode(array('replace_success' => $result));
         exit;
     }
 
     if (isset($_POST['activate'])) {
-    	/* uploads latest version of the 2019 theme and activates it */
-    	$errors = array();
-    	
-    	try {
+        /* uploads latest version of the 2019 theme and activates it */
+        $errors = array();
+
+        try {
           replace2019();
           $replaceSuccess = true;
         } catch (Exception $e) {
             array_push($errors, $e->getMessage());
             $replaceSuccess = false;
         }
-    	
-    	$activateResult = activate2019();
-    	if ($activateResult === true) {
-    		$activateSuccess = true;
-    	} elseif ($activateResult === false) {
-    		$activateSuccess = false;
-    	} else {
-    		$activateSuccess = false;
-    		array_merge($errors, $activateResult);
-    	}
-    	
-    	echo json_encode(array('replace'=>$replaceSuccess,
-    						   'activate'=>$activateSuccess,
-    						   'errors'=>$errors));
+
+        $activateResult = activate2019();
+        if ($activateResult === true) {
+            $activateSuccess = true;
+        } elseif ($activateResult === false) {
+            $activateSuccess = false;
+        } else {
+            $activateSuccess = false;
+            array_merge($errors, $activateResult);
+        }
+
+        echo json_encode(array('replace'=>$replaceSuccess,
+                               'activate'=>$activateSuccess,
+                               'errors'=>$errors));
         exit;
     }
 
     if (isset($_POST['fixPlugin'])) {
-    	/* fixes the EasyWP plugin if its files are not fully present on the website */
+        /* fixes the EasyWP plugin if its files are not fully present on the website */
         $symLink = createEasyWpSymLink() ? 1 : 0;
         $objectCache = createObjectCache() ? 1 : 0;
         echo json_encode(array('symLink' => $symLink, 'objectCache' => $objectCache));
@@ -1487,45 +1527,45 @@ if (authorized()) {
     }
 
     if (isset($_POST['selfDestruct'])) {
-    	/* removes debugger.php and additional files from the server, disables debug */
+        /* removes debugger.php and additional files from the server, disables debug */
         session_destroy();
-    	$files = array('wp-admin/adminer-auto.php',
-    				   'wp-admin/adminer.php',
-    				   'wp-admin/adminer.css',
+        $files = array('wp-admin/adminer-auto.php',
+                       'wp-admin/adminer.php',
+                       'wp-admin/adminer.css',
                         __FILE__);
-    	foreach($files as $file) {
-    		unlink($file);
-    	}
-    	
-    	wpConfigClear();  // disable debug and clear cache silently because if it fails, nothing else can be done anyway
-    	clearAll();
-        
+        foreach($files as $file) {
+            unlink($file);
+        }
+
+        wpConfigClear();  // disable debug and clear cache silently because if it fails, nothing else can be done anyway
+        clearAll();
+
         die(json_encode(array('success' => 1)));
     }
 
     if (isset($_POST['fixFileSystem'])) {
-    	statAllFiles('/var/www/wptbox');
-    	echo json_encode(array('success' => 1));
-    	exit();
+        statAllFiles('/var/www/wptbox');
+        echo json_encode(array('success' => 1));
+        exit();
     }
 
     if (isset($_POST['adminerOn'])) {
-    	/* uploads adminer-auto files and sets the cookie to access Adminer */
-    	if (uploadAdminerFiles()) {
-    		$_SESSION['debugger_adminer'] = true;
-    		die(json_encode(array('success' => 1)));
-    	} else {
-    		die(json_encode(array('success' => 0)));
-    	}
+        /* uploads adminer-auto files and sets the cookie to access Adminer */
+        if (uploadAdminerFiles()) {
+            $_SESSION['debugger_adminer'] = true;
+            die(json_encode(array('success' => 1)));
+        } else {
+            die(json_encode(array('success' => 0)));
+        }
     }
 
     if (isset($_POST['adminerOff'])) {
-    	/* removes adminer-auto files and unsets the cookie */
-    	unlink('wp-admin/adminer-auto.php');
-    	unlink('wp-admin/adminer.php');
-    	unlink('wp-admin/adminer.css');
-    	unset($_SESSION['debugger_adminer']);
-    	die(json_encode(array('success' => 1)));
+        /* removes adminer-auto files and unsets the cookie */
+        unlink('wp-admin/adminer-auto.php');
+        unlink('wp-admin/adminer.php');
+        unlink('wp-admin/adminer.css');
+        unset($_SESSION['debugger_adminer']);
+        die(json_encode(array('success' => 1)));
     }
 
     if (isset($_POST['checkDestDir'])) {
@@ -1753,6 +1793,17 @@ var setMaxheight = function(){
     progressLog.css({'max-height' : winHeight + "px"});
 };
 
+
+var showVerticalLine = function() {
+    var leftHalf = $("#left-half");
+    var winWidth = $(window).width();
+    if (winWidth < 1600) {
+        leftHalf.css({"border-right" : "2px solid #dee2e6"});
+    } else {
+        leftHalf.css({"border-right" : ""});
+    }
+};
+
 </script>
 <?php if (authorized()): ?>
 <script>
@@ -1763,7 +1814,7 @@ var sendFlushRequest = function() {
         timeout: 20000,
         data: {flush: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);                
+            var jsonData = JSON.parse(response);
             handleEmptyResponse($('#btnFlush'), jsonData);
             if (jsonData.redis_success == "1") {
                 printMsg('Redis Flushed Successfully!', false, 'bg-success-custom');
@@ -2077,9 +2128,9 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                startNum: startNum},
         success: function(response) {
             var jsonData = JSON.parse(response);
-            
+
             handleEmptyResponse($('#btnExtract'), jsonData, defaultFailText);
-                
+
             if (jsonData.success) {  // if success, show the success button and message
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnExtract').prop("disabled", false);
@@ -2087,7 +2138,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 printMsg('Archive extracted successfully!', true, 'bg-success-custom');
                 sendFlushRequest();
             }
-            
+
             // if the extraction didn't complete in one turn, start from the last file
             else if (jsonData.startNum) {
                 percentage = (jsonData.startNum/totalNum*100).toFixed() + '%';
@@ -2102,7 +2153,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum);
                 }
             }
-            
+
             else {  // if complete fail, show returned error
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
                 $('#btnExtract').html(defaultFailText);
@@ -2162,7 +2213,7 @@ var processExtractForm = function(form) {
         } else {
             $('#btnExtract').html(defaultFailText);
             $('#btnExtract').prop("disabled", false);
-        }   
+        }
     };
 
     // send request to get total number of files in zip archive
@@ -2172,9 +2223,9 @@ var processExtractForm = function(form) {
     })
     .done(function( response ) {
         var jsonData = JSON.parse(response);
-        
+
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
-            
+
         if (jsonData.success == "1") {
             zipIsExtractable = true;
             totalNumber = jsonData.number;
@@ -2201,9 +2252,9 @@ var processExtractForm = function(form) {
     })
     .done(function( response ) {
         var jsonData = JSON.parse(response);
-        
+
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
-            
+
         if (jsonData.success == "1") {
             dirIsWritable = true;
         } else {
@@ -2238,9 +2289,9 @@ var processViewForm = function(form) {
                archiveName: archiveName},
         success: function(response) {  // on success
             var jsonData = JSON.parse(response);
-            
+
             handleEmptyResponse($('#view-form'), jsonData, defaultFailText);
-                
+
             if (jsonData.success == "1") {  // if success, show the success button and message
                 $('#btnView').prop("disabled", false);
                 $('#btnView').html(defaultDoneText);
@@ -2296,7 +2347,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 $('#btnArchive').html(defaultDoneText);
                 printMsg('Archive created successfully!', true, 'bg-success-custom');
             }
-            
+
             // if the compression didn't complete in one turn, start from the last file
             else if (jsonData.startNum) {
                 percentage = (jsonData.startNum/totalNum*100).toFixed() + '%';
@@ -2377,9 +2428,11 @@ var processArchiveForm = function(form) {
 $(document).ready(function() {
 
     setMaxheight();
+    showVerticalLine();
 
     $(window).resize(function(){
         setMaxheight();
+        showVerticalLine();
     });
 
     $('#archive-name').attr('placeholder', getArchiveName());
@@ -2397,7 +2450,7 @@ $(document).ready(function() {
     $('#archive-form').submit(function(form) {
         processArchiveForm(form);
     });
-    
+
     $('#view-form').submit(function(form) {
         processViewForm(form);
     });
@@ -2405,30 +2458,30 @@ $(document).ready(function() {
     $("#btnFlush").click(function() {
         sendFlushRequest();
     });
-    
+
     $("#btnDebugOn").click(function() {
         sendDebugOnRequest();
     });
-    
+
     $("#btnDebugOff").click(function() {
         sendDebugOffRequest();
     });
-    
+
     $("#btnReplace").click(function() {
         sendReplaceRequest($(this));
     });
-    
+
     $("#btnAdminerOn").click(function() {
         sendAdminerOnRequest();
     });
-    
+
     $("#btnAdminerOff").click(function() {
         sendAdminerOffRequest();
     });
 
     $("#btnActivate").click(function() {
         sendActivateRequest($(this));
-    });    
+    });
 
     $("#btnFixFilesystem").click(function() {
         sendFixFilesystemRequest($(this));
@@ -2437,7 +2490,7 @@ $(document).ready(function() {
     $("#btnFixPlugin").click(function() {
         sendFixPluginRequest();
     });
-    
+
     $("#btnSelfDestruct").click(function() {
         sendSelfDestructRequest();
     });
@@ -2467,7 +2520,7 @@ var processLoginform = function(form) {
             handleEmptyResponse($(''), jsonData);
 
             if (jsonData.success == "1") {
-                location.reload(true);                
+                location.reload(true);
             } else {
                 printMsg('Invalid password');
             }
@@ -2477,7 +2530,7 @@ var processLoginform = function(form) {
         }
     });
 };
-    
+
 $(document).ready(function() {
     $('#login-form').submit(function(form) {
         processLoginform(form);
@@ -2526,14 +2579,14 @@ $(document).ready(function() {
     .bg-success-custom{
         background-color: #c3e6cb;
     }
-    
+
     .scrollbar-secondary::-webkit-scrollbar {
         background-color: #F5F5F5;
         border-bottom-right-radius: 3px;
         border-top-right-radius: 3px;
         max-height: 550px;
         width: 12px;
-        
+
     }
     .scrollbar-secondary::-webkit-scrollbar-thumb {
         background-color: #6C757D;
@@ -2545,11 +2598,11 @@ $(document).ready(function() {
         background-color: #bee5eb;
         color: #0c5460;
     }
-    
+
     /*
         fix round borders for forms
      */
-    
+
     .input-group>.form-control:not(:last-child) {
         border-bottom-right-radius: 3px;
         border-top-right-radius: 3px;
@@ -2587,7 +2640,7 @@ $(document).ready(function() {
 <body>
     <div class="container-fluid h-100">
         <div class="row">
-            <div class="col-6">
+            <div class="col-6" id="left-half">
                 
                 <div class="row">
                     <form id="extract-form">
@@ -2645,7 +2698,7 @@ $(document).ready(function() {
 
             </div>
 
-            <div class="col-6 justify-content-start">
+            <div class="col-6 justify-content-start" id="right-half">
 
                 <div class="row">
                     <div class="col">
@@ -2670,7 +2723,7 @@ $(document).ready(function() {
                             <button type="button" class="btn btn-warning" id="btnAdminerOff">Disable Adminer</button>
                         </div>
                     </div>
-                    <div class="col">
+                    <div class="col-4">
                         <button type="button" class="btn btn-info" id="btnActivate">Activate Clean 2019 Theme</button>
                     </div>
                 </div>
@@ -2695,7 +2748,7 @@ $(document).ready(function() {
                 <div class="progress mt-3 d-none" style="height: 23px;" id="progress-container"></div>
             </div>
         </div>
-    
+
         <div class="row mt-3 d-flex justify-content-center">
             <div class="col-8">
                 <div class="panel panel-primary" id="result-panel">
