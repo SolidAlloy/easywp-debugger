@@ -1405,8 +1405,16 @@ function processArchiveRequest()
     } else {
         $startNum = 0;
     }
-
-    $archive = new DirZipArchive($_POST['archiveName'], $startNum);
+    try {
+        $archive = new DirZipArchive($_POST['archiveName'], $startNum);
+    } catch (Exception $e) {
+        unlink(DIRS);  // remove temporary files in case of complete fail
+        unlink(FILES);
+        return json_encode(array('success' => 0,
+                                 'error' => $e->getMessage(),
+                                 'startNum' => 0,
+                                ));
+    }
 
     if ($startNum == 0) {
         $archive->addDirs();
@@ -1646,19 +1654,12 @@ if (authorized()) {
 
     /* compresses the directory */
     if (isset($_POST['archive'])) {
-        try {
-            $jsonResult = processArchiveRequest();
-            die($jsonResult);
-        } catch (Exception $e) {
-            unlink(DIRS);  //
-            unlink(FILES);
-            die(json_encode(array('success' => 0,
-                                  'error' => $e->getMessage(),
-                                  'startNum' => 0,
-                                 )));
-        }
+        // this wrapper function is needed so that the destructor of the DirZipArchive instance inside processArchiveRequest() is called properly. If die() is called right away, the destructor will not be called.
+        $jsonResult = processArchiveRequest();
+        die($jsonResult);
     }
 
+    /* checks if there is a newer version on Github */
     if (isset($_POST['checkVersion'])) {
         try {
             if (checkNewVersion()) {
@@ -1684,7 +1685,7 @@ if (authorized()) {
  
 <!DOCTYPE html>
 <html lang="en">
-    <head>
+<head>
 
 
 <!-- *                                      -->
@@ -1698,7 +1699,8 @@ if (authorized()) {
 <script>
 
 /**
- * [printMsg outputs given text in the progress log]
+ * [printMsg outputs given text in the progress log if the user is authorized. It has two versions for
+ *  the main and the login page so that one function can use it to display text differently]
  * @param  {string} msg    [string to print]
  * @param  {string} color  [color attribute to add to the <li> tag]
  * @param  {boolean} small  [small text]
@@ -1728,6 +1730,12 @@ var printMsg = function(msg, scroll, color, small) {
 <?php else: ?>
 <script>
 
+/**
+ * [printMsg outputs given text in the box under password field if the user is not authorized. It has two
+ *  versions for the main and the login page so that one function can use it to display text differently]
+ * @param  {string} msg [string to print]
+ * @return {null}
+ */
 var printMsg = function(msg) {
     $('#password-invalid').text(msg);
     $('#password-invalid').removeClass('d-none').addClass('show');
@@ -1742,7 +1750,11 @@ var printMsg = function(msg) {
 var defaultDoneText = '<i class="fas fa-check fa-fw"></i> Submit';
 var defaultFailText = '<i class="fas fa-times fa-fw"></i> Submit';
 
-
+/**
+ * [handleEmptyField asks to enter password if the field is empty]
+ * @param  {string} fieldValue [string entered in the password field]
+ * @return {boolean}           [true if the password field is empty]
+ */
 var handleEmptyField = function(fieldValue) {
     if (fieldValue === "") {
         printMsg('Please enter the password');
@@ -1752,7 +1764,13 @@ var handleEmptyField = function(fieldValue) {
     }
 };
 
-
+/**
+ * [handleEmptyResponse shows warning is no JSON was found in the response]
+ * @param  {object} $button  []
+ * @param  {object} jsonData [description]
+ * @param  {string} failText [description]
+ * @return {null}
+ */
 var handleEmptyResponse = function($button, jsonData, failText) {
     if (!$.trim(jsonData)){
         if (failText) {
