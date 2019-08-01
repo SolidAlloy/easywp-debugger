@@ -1592,7 +1592,7 @@ if (authorized()) {
         exit();
     }
 
-    /* uploads adminer-auto files and sets the cookie to access Adminer */
+    /* uploads adminer-auto files and sets a session to access Adminer */
     if (isset($_POST['adminerOn'])) {
         if (uploadAdminerFiles()) {
             $_SESSION['debugger_adminer'] = true;
@@ -1602,7 +1602,7 @@ if (authorized()) {
         }
     }
 
-    /* removes adminer-auto files and unsets the cookie */
+    /* removes adminer-auto files and unsets the session */
     if (isset($_POST['adminerOff'])) {
         unlink('wp-admin/adminer-auto.php');
         unlink('wp-admin/adminer.php');
@@ -1765,10 +1765,10 @@ var handleEmptyField = function(fieldValue) {
 };
 
 /**
- * [handleEmptyResponse shows warning is no JSON was found in the response]
- * @param  {object} $button  []
- * @param  {object} jsonData [description]
- * @param  {string} failText [description]
+ * [handleEmptyResponse shows warning if no JSON was found in the response]
+ * @param  {object} $button  [button which state should be changed to failed]
+ * @param  {object} jsonData [parsend json string]
+ * @param  {string} failText [text to insert into the button]
  * @return {null}
  */
 var handleEmptyResponse = function($button, jsonData, failText) {
@@ -1805,7 +1805,6 @@ var handleErrors = function (jqXHR, exception, excludeList) {
             }
         }
     });
-
     if (stopFunction) {
         return;
     }
@@ -1831,19 +1830,35 @@ var handleErrors = function (jqXHR, exception, excludeList) {
     printMsg(msg, true, 'bg-danger-custom');
 };
 
+/**
+ * [prependZero puts 0 before the number if it is less than 10. Doesn't work on numbers above 99]
+ * @param  {integer} num [number where 0 should be put]
+ * @return {string}     [number with 0 at the beginning]
+ */
+var prependZero = function(num) {
+    return ('0' + num).slice(-2);
+};
+
+/**
+ * [getArchiveName generates a default name of the archive to create]
+ * @return {string} [generated name of the archive]
+ */
 var getArchiveName = function() {
     var currentDate = new Date();
-    var date = currentDate.getDate();
-    var month = currentDate.getMonth() + 1;
+    var date = prependZero(currentDate.getDate());
+    var month = prependZero(currentDate.getMonth() + 1);
     var year = currentDate.getFullYear();
-    var hour = currentDate.getHours();
-    var minute = currentDate.getMinutes();
-    var second = currentDate.getSeconds();
+    var hour = prependZero(currentDate.getHours());
+    var minute = prependZero(currentDate.getMinutes());
+    var second = prependZero(currentDate.getSeconds());
 
     archiveName = "wp-files-"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
     return archiveName;
 };
 
+/**
+ * [setMaxheight sets maximum height of progress log so that it always stays within the window]
+ */
 var setMaxheight = function(){
     var progressLog = $("#progress-log");
     var winHeight = $(window).height();
@@ -1851,7 +1866,10 @@ var setMaxheight = function(){
     progressLog.css({'max-height' : winHeight + "px"});
 };
 
-
+/**
+ * [showVerticalLine shows vertical line between forms and buttons if the distance between them is too short]
+ * @return {null}
+ */
 var showVerticalLine = function() {
     var leftHalf = $("#left-half");
     var winWidth = $(window).width();
@@ -1866,6 +1884,10 @@ var showVerticalLine = function() {
 <?php if (authorized()): ?>
 <script>
 
+/**
+ * [sendFlushRequest sends POST request to flush Varnish and Redis caches]
+ * @return {null}
+ */
 var sendFlushRequest = function() {
     $.ajax({
         type: "POST",
@@ -1896,7 +1918,10 @@ var sendFlushRequest = function() {
     });
 };
 
-
+/**
+ * [sendDebugOnRequest sends POST request to enable on-screen errors and wp-debug on the website]
+ * @return {null}
+ */
 var sendDebugOnRequest = function() {
     $.ajax({
         type: "POST",
@@ -1918,7 +1943,10 @@ var sendDebugOnRequest = function() {
     });
 };
 
-
+/**
+ * [sendDebugOffRequest sends POST request to disable on-screen errors and wp-debug on the website]
+ * @return {null}
+ */
 var sendDebugOffRequest = function() {
     $.ajax({
         type: "POST",
@@ -1940,7 +1968,11 @@ var sendDebugOffRequest = function() {
     });
 };
 
-
+/**
+ * [sendReplaceRequest sends POST request to replace default WordPress files with files of the latest version]
+ * @param  {object} $button [button which state should be changed in the process]
+ * @return {null}
+ */
 var sendReplaceRequest = function($button) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Replacing...';
     var doneText = '<i class="fas fa-check fa-fw"></i> Replace Default Files';
@@ -1972,7 +2004,11 @@ var sendReplaceRequest = function($button) {
     });
 };
 
-
+/**
+ * [sendActivateRequest uploads and activates the 2019 WordPress theme]
+ * @param  {object} $button [button which state should be changed in the process]
+ * @return {null}
+ */
 var sendActivateRequest = function($button) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Activating...';
     var doneText = '<i class="fas fa-check fa-fw"></i> Activate Clean 2019 Theme';
@@ -2017,7 +2053,10 @@ var sendActivateRequest = function($button) {
     });
 };
 
-
+/**
+ * [sendAdminerOnRequest uploads adminer-auto files and creates a session to access Adminer]
+ * @return {null}
+ */
 var sendAdminerOnRequest = function() {
     $.ajax({
         type: "POST",
@@ -2040,7 +2079,10 @@ var sendAdminerOnRequest = function() {
     });
 };
 
-
+/**
+ * [sendAdminerOffRequest removes adminer-auto files and unsets the session]
+ * @return {null}
+ */
 var sendAdminerOffRequest = function() {
     $.ajax({
         type: "POST",
@@ -2061,7 +2103,11 @@ var sendAdminerOffRequest = function() {
     });
 };
 
-
+/**
+ * [sendFixFilesystemRequest runs stats on all files in the root directory to resolve the filesystem bug]
+ * @param  {object} $button [button which state should be changed in the process]
+ * @return {null}
+ */
 var sendFixFilesystemRequest = function($button) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Fixing...';
     var doneText = '<i class="fas fa-check fa-fw"></i> Fix FileSystem';
@@ -2090,7 +2136,10 @@ var sendFixFilesystemRequest = function($button) {
     });
 };
 
-
+/**
+ * [sendFixPluginRequest creates a symlink if it is not created and uploads object-cache.php if it is missing]
+ * @return {null}
+ */
 var sendFixPluginRequest = function() {
     $.ajax({
         type: "POST",
@@ -2117,7 +2166,10 @@ var sendFixPluginRequest = function() {
     });
 };
 
-
+/**
+ * [sendSelfDestructRequest removes debugger.php and additional files]
+ * @return {null}
+ */
 var sendSelfDestructRequest = function() {
     $.ajax({
         type: "POST",
@@ -2136,7 +2188,10 @@ var sendSelfDestructRequest = function() {
     });
 };
 
-
+/**
+ * [sendVersionCheckRequest checks if the version on GitHub is higher than the current one]
+ * @return {null}
+ */
 var sendVersionCheckRequest = function() {
     $.ajax({
         type: "POST",
@@ -2244,7 +2299,11 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
     });
 };
 
-
+/**
+ * [processExtractForm ]
+ * @param  {[type]} form [description]
+ * @return {[type]}      [description]
+ */
 var processExtractForm = function(form) {
     // preparations
     form.preventDefault();
