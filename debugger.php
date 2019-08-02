@@ -2300,9 +2300,9 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
 };
 
 /**
- * [processExtractForm ]
- * @param  {[type]} form [description]
- * @return {[type]}      [description]
+ * [processExtractForm does pre-checks and starts the extraction]
+ * @param  {object} form [extraction form]
+ * @return {null}
  */
 var processExtractForm = function(form) {
     // preparations
@@ -2390,7 +2390,11 @@ var processExtractForm = function(form) {
 
 };
 
-
+/**
+ * [processViewForm shows a list of files inside the archive]
+ * @param  {object} form [view-archive form]
+ * @return {null}
+ */
 var processViewForm = function(form) {
     // preparations
     form.preventDefault();
@@ -2435,12 +2439,10 @@ var processViewForm = function(form) {
 
 
 /**
- * [sendArchiveRequest sends a request to archive ZIP archive and processes the response]
- * @param  {string} archiveName  [path to zip file]
- * @param  {string} destDir      [destination directory]
- * @param  {integer} maxArchiveTime [maximum time to process archiveion]
- * @param  {integer} totalNum     [total number of files in archive]
- * @param  {integer} startNum     [number of file to start archiveing from]
+ * [sendArchiveRequest sends a request to compress a directory and processes the response]
+ * @param  {string} archiveName     [path to zip file]
+ * @param  {integer} totalNum       [total number of files in a directory]
+ * @param  {integer} startNum       [the number of file to start compressing from]
  * @return {null}
  */
 var sendArchiveRequest = function(archiveName, totalNum, startNum) {
@@ -2469,7 +2471,6 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
             else if (jsonData.startNum) {
                 percentage = (jsonData.startNum/totalNum*100).toFixed() + '%';
                 $('#progress-bar').text(percentage).width(percentage);
-                // if the compression didn't complete but another file appeared to be the last one, continue the next iteration from it (of if there were no starting files before)
                 startNum = jsonData.startNum;
                 sendArchiveRequest(archiveName, totalNum, startNum);
             } else {  // if complete fail, show returned error
@@ -2488,7 +2489,11 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
     });
 };
 
-
+/**
+ * [processArchiveForm does pre-checks and starts compressing the directory]
+ * @param  {object} form [compressing form]
+ * @return {null}
+ */
 var processArchiveForm = function(form) {
     // preparations
     form.preventDefault();
@@ -2552,10 +2557,10 @@ $(document).ready(function() {
         showVerticalLine();
     });
 
-    $('#archive-name').attr('placeholder', getArchiveName());
+    $('#archive-name').attr('placeholder', getArchiveName());  // show default name of a backup in the field
 
     $("#folder-archive").on("input", function(){
-        $("#archive-name").attr('placeholder', $(this).val()+'.zip');
+        $("#archive-name").attr('placeholder', $(this).val()+'.zip');  // change the name of archive making it similar to the name of directory
     });
 
     sendVersionCheckRequest();
