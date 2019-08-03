@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.1');
+define('VERSION', '1.2');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -508,6 +508,25 @@ class DBconn {
             return true;
         } else {
             return false;
+        }
+    }
+
+    /**
+     * [getSiteUrl returns website URL from the database]
+     * @return string [website URL]
+     */
+    public function getSiteUrl()
+    {
+        if (!$this->connected) {
+            return false;
+        }
+        $siteurlQuery = "SELECT `option_value` FROM `" . $this->db_details['prefix'] . "options` WHERE `option_name`='siteurl'";
+        $result = $this->mysqlConn->query($siteurlQuery);
+        $row = $result->fetch_array(MYSQLI_NUM);
+        if ($row) {
+            return $row[0];
+        } else {
+            return '';
         }
     }
 }
@@ -1146,26 +1165,27 @@ function statAllFiles($dir)
     }
 }
 
+
 /**
- * [uploadAdminerFiles uploads adminer-auto files to wp-admin]
+ * [uploadAdminerFiles uploads files from URLs to storage]
  * @return boolean [success of the upload]
  */
-function uploadAdminerFiles()
-{
-    $file1 = 'wp-admin/adminer-auto.php';  // custom extension file to bypass login form
-    $file2 = 'wp-admin/adminer.php';  // default Adminer (MySQL-only & English-only)
-    $file3 = 'wp-admin/adminer.css';  // Adminer Material Theme https://github.com/arcs-/Adminer-Material-Theme
-    $result1 = file_put_contents($file1, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php'));
-    $result2 = file_put_contents($file2, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php'));
-    $result3 = file_put_contents($file3, file_get_contents('https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css'));
-    if ($result1 && $result2 && $result3) {
-        return true;
-    } else {
-        unlink($file1);
-        unlink($file2);
-        unlink($file3);
-        return false;
+function uploadFiles($filesAndSources) {
+    $results = array();
+    foreach ($filesAndSources as $file=>$source) {
+        $result = file_put_contents($file, file_get_contents($source));
+        array_push($results, $result);
     }
+    // if any element of array is false, in_array will return false
+    if (in_array(false, $results, true)) {
+        foreach ($filesAndSources as $file=>$source) {
+            unlink($file);
+        }
+        return false;
+    } else {
+        return true;
+    }
+
 }
 
 /**
@@ -1594,7 +1614,11 @@ if (authorized()) {
 
     /* uploads adminer-auto files and sets a session to access Adminer */
     if (isset($_POST['adminerOn'])) {
-        if (uploadAdminerFiles()) {
+        $adminerFilesAndSources = array('wp-admin/adminer-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php' ,
+                                        'wp-admin/adminer.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php' ,
+                                        'wp-admin/adminer.css' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css' ,
+                                        );
+        if (uploadFiles($adminerFilesAndSources)) {
             $_SESSION['debugger_adminer'] = true;
             die(json_encode(array('success' => 1)));
         } else {
@@ -1676,6 +1700,48 @@ if (authorized()) {
 
         die(json_encode(array('success' => $success,
                               'new' => $new,
+                             )));
+    }
+
+    /* gets WordPress siteurl and upload the wp-admin-auto.php file */
+    if (isset($_POST['autoLogin'])) {
+        // get site URL
+        $dbConn = new DBconn;
+        if (!$dbConn->errors) {
+            $siteUrl = $dbConn->getSiteUrl();
+            $errors = array();
+        } else {
+            $siteUrl = '';
+            $errors = $dbConn->errors;
+        }
+
+        // if there is site URL, proceed with uploading the wp-admin-auto file
+        if ($siteUrl) {
+            $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564759951/wp-admin-auto_kcfyxv.php' ,
+                                              );
+            if (uploadFiles($autoLoginFilesAndSources)) {
+                $autoLoginfile = true;
+            } else {
+                $autoLoginfile = false;
+            }
+        } else {
+            $success = false;
+            $file = false;
+        }
+
+        // if there is site URL and the file is uploaded successfully, everything is good
+        if ($autoLoginfile) {
+            $success = true;
+            $file = true;
+        } else {
+            $success = false;
+            $file = false;
+        }
+
+        die(json_encode(array('success' => $success ,
+                              'siteurl' => $siteUrl ,
+                              'file'    => $file ,
+                              'errors'  => $errors ,
                              )));
     }
 
@@ -1852,7 +1918,7 @@ var getArchiveName = function() {
     var minute = prependZero(currentDate.getMinutes());
     var second = prependZero(currentDate.getSeconds());
 
-    archiveName = "wp-files-"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
+    archiveName = "wp-files_"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
     return archiveName;
 };
 
@@ -2159,6 +2225,42 @@ var sendFixPluginRequest = function() {
                 printMsg('object-cache.php Creation Failed!', true, 'bg-warning-custom');
             }
             sendFlushRequest();
+        },
+        error: function (jqXHR, exception) {
+            handleErrors(jqXHR, exception);
+        }
+    });
+};
+
+/**
+ * [sendAutoLoginRequest uploads wp-admin-auto.php and opens it in a new tab]
+ * @return {null}
+ */
+var sendAutoLoginRequest = function() {
+    $.ajax({
+        type: "POST",
+        data: {autoLogin: 'submit'},
+        timeout: 40000,
+        success: function(response) {
+            var jsonData = JSON.parse(response);
+            handleEmptyResponse($("#btnAutoLogin"), jsonData);
+            if (jsonData.success == "1") {
+                printMsg('Success! You will be redirected in a second', true, 'bg-success-custom');
+                // open wp-admin-auto in a new tab in 1 second after the success message is shown
+                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
+            } else {
+                if (!jsonData.file) {
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-custom');
+                }
+                if (!jsonData.siteurl) {
+                    printMsg('Failed to find wp-admin-auto.php.', true, 'bg-warning-custom');
+                }
+                if (jsonData.errors.length !== 0) {
+                    jsonData.errors.forEach(function(item, index, array) {
+                        printMsg(item, true, 'bg-danger-custom');
+                    });
+                }
+            }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
@@ -2613,6 +2715,10 @@ $(document).ready(function() {
         sendFixPluginRequest();
     });
 
+    $("#btnAutoLogin").click(function() {
+        sendAutoLoginRequest();
+    });
+
     $("#btnSelfDestruct").click(function() {
         sendSelfDestructRequest();
     });
@@ -2796,7 +2902,7 @@ $(document).ready(function() {
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info ml-3">To</div>
                             </div>
-                            <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 255px;">
+                            <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 260px;">
                             <span class="input-group-btn ml-3">
                                 <button type="submit" class="btn btn-secondary" id="btnArchive">Submit</button>
                             </span>
@@ -2856,6 +2962,9 @@ $(document).ready(function() {
                     </div>
                     <div class="col">
                         <button type="button" class="btn btn-info" id="btnFixPlugin">Fix EasyWP Plugin</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn btn-info" id="btnAutoLogin">Log into wp-admin</button>
                     </div>
                     <div class="col">
                         <button type="button" class="btn btn-danger" id="btnSelfDestruct">Remove File From Server</button>
