@@ -1,6 +1,4 @@
 <?php
-@unlink(__FILE__);
-
 require('wp-blog-header.php');
 require('wp-includes/pluggable.php');
 
