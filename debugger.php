@@ -511,6 +511,25 @@ class DBconn {
         }
     }
 
+    /**
+     * [getSiteUrl returns website URL from the database]
+     * @return string [website URL]
+     */
+    public function getSiteUrl()
+    {
+        if (!$this->connected) {
+            return false;
+        }
+        $siteurlQuery = "SELECT `option_value` FROM `" . $this->db_details['prefix'] . "options` WHERE `option_name`='siteurl'";
+        $result = $this->mysqlConn->query($siteurlQuery);
+        $row = $result->fetch_array(MYSQLI_NUM);
+        if ($row) {
+            return $row[0];
+        } else {
+            return '';
+        }
+    }
+
 }
 
 /**
@@ -1685,16 +1704,43 @@ if (authorized()) {
                              )));
     }
 
-    /* uploads the wp-admin-auto.php file */
+    /* gets WordPress siteurl and upload the wp-admin-auto.php file */
     if (isset($_POST['autoLogin'])) {
-        // upload the wp-admin-auto file
-        $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
-                                          );
-        if (uploadFiles($autoLoginFilesAndSources)) {
-            die(json_encode(array('success' => true)));
+        // get site URL
+        $dbConn = new DBconn;
+        if (!$dbConn->errors) {
+            $siteUrl = $dbConn->getSiteUrl();
+            $errors = array();
         } else {
-            die(json_encode(array('success' => false)));
+            $siteUrl = '';
+            $errors = $dbConn->errors;
         }
+         // if there is site URL, proceed with uploading the wp-admin-auto file
+        if ($siteUrl) {
+            $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
+                                              );
+            if (uploadFiles($autoLoginFilesAndSources)) {
+                $autoLoginfile = true;
+            } else {
+                $autoLoginfile = false;
+            }
+        } else {
+            $success = false;
+            $file = false;
+        }
+         // if there is site URL and the file is uploaded successfully, everything is good
+        if ($autoLoginfile) {
+            $success = true;
+            $file = true;
+        } else {
+            $success = false;
+            $file = false;
+        }
+         die(json_encode(array('success' => $success ,
+                              'siteurl' => $siteUrl ,
+                              'file'    => $file ,
+                              'errors'  => $errors ,
+                             )));
     }
 
     /* deletes wp-admin-auto.php file */
@@ -2230,10 +2276,20 @@ var sendAutoLoginRequest = function() {
             if (jsonData.success) {
                 printMsg('Success! You will be redirected in a second', true, 'bg-success-custom');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
-                setTimeout(function() { window.open("wp-admin-auto.php"); }, 1000);
+                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
-                printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-danger-custom');
+                if (!jsonData.file) {
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-custom'); 
+                }   
+                if (!jsonData.siteurl) {    
+                    printMsg('Failed to find siteurl', true, 'bg-warning-custom');   
+                }   
+                if (jsonData.errors.length !== 0) { 
+                    jsonData.errors.forEach(function(item, index, array) {  
+                        printMsg(item, true, 'bg-danger-custom');   
+                    }); 
+                }
             }
         },
         error: function (jqXHR, exception) {
