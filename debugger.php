@@ -1891,7 +1891,7 @@ var handleEmptyResponse = function($button, jsonData, failText) {
             $button.html(failText);
             $button.prop("disabled", false);
         }
-        printMsg("Empty response was returned", true, 'bg-danger-custom');
+        printMsg("Empty response was returned", true, 'bg-danger-light');
     }
 };
 
@@ -1941,7 +1941,7 @@ var handleErrors = function (jqXHR, exception, excludeList) {
         msg = 'Uncaught Error.\n' + jqXHR.responseText;
     }
 
-    printMsg(msg, true, 'bg-danger-custom');
+    printMsg(msg, true, 'bg-danger-light');
 };
 
 /**
@@ -1976,7 +1976,7 @@ var getArchiveName = function() {
 var setMaxheight = function(){
     var progressLog = $("#progress-log");
     var winHeight = $(window).height();
-    winHeight -= 350;
+    winHeight -= 400;
     progressLog.css({'max-height' : winHeight + "px"});
 };
 
@@ -2012,23 +2012,23 @@ var sendFlushRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($('#btnFlush'), jsonData);
-            if (jsonData.redis_success == "1") {
-                printMsg('Redis Flushed Successfully!', false, 'bg-success-custom');
+            if (jsonData.redis_success) {
+                printMsg('Redis Flushed Successfully!', false, 'bg-success-light');
             } else {
-                printMsg('Redis Flush Failed!', false, 'bg-warning-custom');
+                printMsg('Redis Flush Failed!', false, 'bg-warning-light');
             }
-            if (jsonData.varnish_success == "1") {
-                printMsg('Varnish Flushed Successfully!', true, 'bg-success-custom');
+            if (jsonData.varnish_success) {
+                printMsg('Varnish Flushed Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('Varnish Flush Failed!', true, 'bg-warning-custom');
+                printMsg('Varnish Flush Failed!', true, 'bg-warning-light');
             }
             if (jsonData.errors.length !== 0) {
                 jsonData.errors.forEach(function(item, index, array) {
-                    printMsg(item, true, 'bg-danger-custom');
+                    printMsg(item, true, 'bg-danger-light');
                 });
             }
         },
@@ -2052,14 +2052,14 @@ var sendDebugOnRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnDebugOn"), jsonData);
-            if (jsonData.debug_on_success == "1") {
-                printMsg('Debug Enabled Successfully!', true, 'bg-success-custom');
+            if (jsonData.debug_on_success) {
+                printMsg('Debug Enabled Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('Enabling Debug Failed!', true, 'bg-warning-custom');
+                printMsg('Enabling Debug Failed!', true, 'bg-warning-light');
             }
             sendFlushRequest();
         },
@@ -2083,14 +2083,14 @@ var sendDebugOffRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnDebugOff"), jsonData);
-            if (jsonData.debug_off_success == "1") {
-                printMsg('Debug Disabled Successfully!', true, 'bg-success-custom');
+            if (jsonData.debug_off_success) {
+                printMsg('Debug Disabled Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('Disabling Debug Failed!', true, 'bg-warning-custom');
+                printMsg('Disabling Debug Failed!', true, 'bg-warning-light');
             }
             sendFlushRequest();
         },
@@ -2122,16 +2122,16 @@ var sendReplaceRequest = function($button) {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 $button.html(failText);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
-            if (jsonData.replace_success == "1") {
+            if (jsonData.replace_success) {
                 $button.html(doneText);
-                printMsg('Files Replaced Successfully!', true, 'bg-success-custom');
+                printMsg('Files Replaced Successfully!', true, 'bg-success-light');
             } else {
                 $button.html(failText);
-                printMsg('Files Replacing Failed!', true, 'bg-warning-custom');
+                printMsg('Files Replacing Failed!', true, 'bg-warning-light');
             }
             sendFlushRequest();
         },
@@ -2165,7 +2165,7 @@ var sendActivateRequest = function($button) {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 $button.html(failText);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
@@ -2175,18 +2175,18 @@ var sendActivateRequest = function($button) {
                 $button.html(failText);
             }
             if (jsonData.replace == "1") {
-                printMsg('Theme Uploaded Successfully!', false, 'bg-success-custom');
+                printMsg('Theme Uploaded Successfully!', false, 'bg-success-light');
             } else {
-                printMsg('Theme Upload Failed!', false, 'bg-warning-custom');
+                printMsg('Theme Upload Failed!', false, 'bg-warning-light');
             }
             if (jsonData.activate == "1") {
-                printMsg('Theme Activated Successfully!', true, 'bg-success-custom');
+                printMsg('Theme Activated Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('Theme Activation Failed!', true, 'bg-warning-custom');
+                printMsg('Theme Activation Failed!', true, 'bg-warning-light');
             }
             if (jsonData.errors.length !== 0) {
                 jsonData.errors.forEach(function(item, index, array) {
-                    printMsg(item, true, 'bg-danger-custom');
+                    printMsg(item, true, 'bg-danger-light');
                 });
             }
             sendFlushRequest();
@@ -2213,16 +2213,16 @@ var sendAdminerOnRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnAdminerOff"), jsonData);
-            if (jsonData.success == "1") {
-                printMsg('Adminer Enabled Successfully!', true, 'bg-success-custom');
+            if (jsonData.success) {
+                printMsg('Adminer Enabled Successfully!', true, 'bg-success-light');
                 // open Adminer in a new tab in 1 second after the success message is shown
                 setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
             } else {
-                printMsg('Adminer Failed!', true, 'bg-warning-custom');
+                printMsg('Adminer Failed!', true, 'bg-warning-light');
             }
         },
         error: function (jqXHR, exception) {
@@ -2245,14 +2245,14 @@ var sendAdminerOffRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("btnAdminerOff"), jsonData);
-            if (jsonData.success == "1") {
-                printMsg('Adminer Disabled Successfully!', true, 'bg-success-custom');
+            if (jsonData.success) {
+                printMsg('Adminer Disabled Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('Adminer Disabling Failed!', true, 'bg-warning-custom');
+                printMsg('Adminer Disabling Failed!', true, 'bg-warning-light');
             }
         },
         error: function (jqXHR, exception) {
@@ -2283,14 +2283,14 @@ var sendFixFilesystemRequest = function($button) {
             } catch (e) {
                 $button.html(failText);
                 $button.prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
-            if (jsonData.success == "1") {
+            if (jsonData.success) {
                 $button.html(doneText);
                 $button.prop("disabled", false);
-                printMsg('FileSystem Has Been Fixed!', true, 'bg-success-custom');
+                printMsg('FileSystem Has Been Fixed!', true, 'bg-success-light');
             }
             sendFlushRequest();
         },
@@ -2316,19 +2316,19 @@ var sendFixPluginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($('#btnFixPlugin'), jsonData);
-            if (jsonData.symLink == "1") {
-                printMsg('Symlink Created Successfully!', false, 'bg-success-custom');
+            if (jsonData.symLink) {
+                printMsg('Symlink Created Successfully!', false, 'bg-success-light');
             } else {
-                printMsg('Symlink Creation Failed!', false, 'bg-warning-custom');
+                printMsg('Symlink Creation Failed!', false, 'bg-warning-light');
             }
-            if (jsonData.objectCache == "1") {
-                printMsg('object-cache.php Created Successfully!', true, 'bg-success-custom');
+            if (jsonData.objectCache) {
+                printMsg('object-cache.php Created Successfully!', true, 'bg-success-light');
             } else {
-                printMsg('object-cache.php Creation Failed!', true, 'bg-warning-custom');
+                printMsg('object-cache.php Creation Failed!', true, 'bg-warning-light');
             }
             sendFlushRequest();
         },
@@ -2352,12 +2352,12 @@ var sendDeleteAutoLoginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (!jsonData.success) {
-                printMsg('Failed to remove wp-admin-auto.php. Please do it manually', true, 'bg-warning-custom');
+                printMsg('Failed to remove wp-admin-auto.php. Please do it manually', true, 'bg-warning-light');
             }
         },
         error: function (jqXHR, exception) {
@@ -2380,25 +2380,25 @@ var sendAutoLoginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (jsonData.success) {
-                printMsg('Success! You will be redirected in a second', true, 'bg-success-custom');
+                printMsg('Success! You will be redirected in a second', true, 'bg-success-light');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
                 setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (!jsonData.file) {
-                    printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-custom'); 
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-light'); 
                 }   
                 if (!jsonData.siteurl) {    
-                    printMsg('Failed to find siteurl', true, 'bg-warning-custom');   
+                    printMsg('Failed to find siteurl', true, 'bg-warning-light');   
                 }   
                 if (jsonData.errors.length !== 0) { 
                     jsonData.errors.forEach(function(item, index, array) {  
-                        printMsg(item, true, 'bg-danger-custom');   
+                        printMsg(item, true, 'bg-danger-light');   
                     }); 
                 }
             }
@@ -2423,12 +2423,12 @@ var sendSelfDestructRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             handleEmptyResponse($("#btnSelfDestruct"), jsonData);
-            if (jsonData.success == "1") {
-                printMsg('debugger.php Deleted Successfully!', true, 'bg-success-custom');
+            if (jsonData.success) {
+                printMsg('debugger.php Deleted Successfully!', true, 'bg-success-light');
             }
         },
         error: function (jqXHR, exception) {
@@ -2501,7 +2501,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
             } catch (e) {
                 $('#btnExtract').html(defaultFailText);
                 $('#btnExtract').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
 
@@ -2511,7 +2511,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnExtract').prop("disabled", false);
                 $('#btnExtract').html(defaultDoneText);
-                printMsg('Archive extracted successfully!', true, 'bg-success-custom');
+                printMsg('Archive extracted successfully!', true, 'bg-success-light');
                 sendFlushRequest();
             }
 
@@ -2522,10 +2522,10 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 // if the starting file was already sent before, skip it and show alert message
                 if (startNum == jsonData.startNum) {
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum+1);
-                    printMsg("The following file will not be extracted because it's too big: <strong>"+jsonData.failedFile+"</strong>", true, 'bg-warning-custom');
+                    printMsg("The following file will not be extracted because it's too big: <strong>"+jsonData.failedFile+"</strong>", true, 'bg-warning-light');
                 } else {  // if the extraction didn't complete but another file appeared to be the last one, continue the next iteration from it (of if there were no starting files before)
                     startNum = jsonData.startNum;
-                    printMsg('The connection was interrupted on <strong>'+jsonData.failedFile+'</strong>, resuming extraction from it.', true, 'bg-info-custom');
+                    printMsg('The connection was interrupted on <strong>'+jsonData.failedFile+'</strong>, resuming extraction from it.', true, 'bg-info-light');
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum);
                 }
             }
@@ -2534,14 +2534,14 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
                 $('#btnExtract').html(defaultFailText);
                 $('#btnExtract').prop("disabled", false);
-                printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
             }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception, [0, 503]); // handle errors except for 0 and 503
             if (jqXHR.status == 503 || jqXHR.status === 0) {
                 if (maxUnzipTime == 10) {  // if the limit is already 10, nothing will help
-                    printMsg('Even requests limited by 10 seconds return 503 or network errors', true, 'bg-danger-custom');
+                    printMsg('Even requests limited by 10 seconds return 503 or network errors', true, 'bg-danger-light');
                     $('#btnExtract').html(defaultFailText);
                     $('#btnExtract').prop("disabled", false);
                     $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
@@ -2551,7 +2551,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                     } else {
                         error = 'Failed To Connect. Network Error';
                     }
-                    printMsg('Previous request returned <strong>"'+error+'"</strong>. Decreasing the time limit by 10 seconds and sending the request again.', true, 'bg-warning-custom');
+                    printMsg('Previous request returned <strong>"'+error+'"</strong>. Decreasing the time limit by 10 seconds and sending the request again.', true, 'bg-warning-light');
                     maxUnzipTime -= 10;  // if the request returned 503 because overusing a limit, try decreasing the time limit
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum);
                 }
@@ -2579,7 +2579,7 @@ var processExtractForm = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Extracting...';
     $('#btnExtract').prop("disabled", true);
     $('#btnExtract').html(loadingText);
-    printMsg('Starting Extraction. First request sent. The next update is within ' + defaultTimeLimit + ' seconds.', true, 'bg-info-custom');
+    printMsg('Starting Extraction. First request sent. The next update is within ' + defaultTimeLimit + ' seconds.', true, 'bg-info-light');
 
     var zipIsExtractable = false;
     var dirIsWritable = false;
@@ -2608,17 +2608,17 @@ var processExtractForm = function(form) {
         } catch (e) {
             $('#btnExtract').html(defaultFailText);
             $('#btnExtract').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            printMsg('The returned value is not JSON', true, 'bg-danger-light');
             return;
         }
 
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
 
-        if (jsonData.success == "1") {
+        if (jsonData.success) {
             zipIsExtractable = true;
             totalNumber = jsonData.number;
         } else {
-            printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+            printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
         }
     })
     .fail(function( jqXHR, exception, message ) {
@@ -2645,16 +2645,16 @@ var processExtractForm = function(form) {
         } catch (e) {
             $('#btnExtract').html(defaultFailText);
             $('#btnExtract').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            printMsg('The returned value is not JSON', true, 'bg-danger-light');
             return;
         }
 
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
 
-        if (jsonData.success == "1") {
+        if (jsonData.success) {
             dirIsWritable = true;
         } else {
-            printMsg('An error happened upon extracting the backup: <strong>Destination directory is not writable and we failed to create such directory</strong>', true, 'bg-danger-custom');
+            printMsg('An error happened upon extracting the backup: <strong>Destination directory is not writable and we failed to create such directory</strong>', true, 'bg-danger-light');
         }
     })
     .fail(function( jqXHR, exception, message ) {
@@ -2694,13 +2694,13 @@ var processViewForm = function(form) {
             } catch (e) {
                 $('#btnView').html(defaultFailText);
                 $('#btnView').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
 
             handleEmptyResponse($('#btnView'), jsonData, defaultFailText);
 
-            if (jsonData.success == "1") {  // if success, show the success button and message
+            if (jsonData.success) {  // if success, show the success button and message
                 $('#btnView').prop("disabled", false);
                 $('#btnView').html(defaultDoneText);
                 jsonData.files.forEach(function(item, index, array) {
@@ -2713,7 +2713,7 @@ var processViewForm = function(form) {
             else {  // if complete fail, show returned error
                 $('#btnView').html(defaultFailText);
                 $('#btnView').prop("disabled", false);
-                printMsg('An error happened upon opening the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon opening the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
             }
         },
         error: function (jqXHR, exception, message) {  // on error
@@ -2749,7 +2749,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
             } catch (e) {
                 $('#btnArchive').html(defaultFailText);
                 $('#btnArchive').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
             
@@ -2759,7 +2759,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnArchive').prop("disabled", false);
                 $('#btnArchive').html(defaultDoneText);
-                printMsg('Archive created successfully!', true, 'bg-success-custom');
+                printMsg('Archive created successfully!', true, 'bg-success-light');
             }
 
             // if the compression didn't complete in one turn, start from the last file
@@ -2772,7 +2772,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
                 $('#btnArchive').html(defaultFailText);
                 $('#btnArchive').prop("disabled", false);
-                printMsg('An error happened upon creating the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon creating the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
             }
         },
         error: function (jqXHR, exception) {
@@ -2807,7 +2807,7 @@ var processArchiveForm = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Compressing...';
     $('#btnArchive').prop("disabled", true);
     $('#btnArchive').html(loadingText);
-    printMsg('Starting Compression...', true, 'bg-info-custom');
+    printMsg('Starting Compression...', true, 'bg-info-light');
 
     // send request to get total number of files in directory
     var compressPreCheck = $.ajax({
@@ -2823,7 +2823,7 @@ var processArchiveForm = function(form) {
         } catch (e) {
             $('#btnArchive').html(defaultFailText);
             $('#btnArchive').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            printMsg('The returned value is not JSON', true, 'bg-danger-light');
             return;
         }
         
@@ -2836,10 +2836,10 @@ var processArchiveForm = function(form) {
             $('#btnArchive').html(defaultFailText);
             $('#btnArchive').prop("disabled", false);
             if (!jsonData.numberSuccess) {
-                printMsg('An error happened upon compressing the directory: <strong>'+jsonData.numberError+'</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon compressing the directory: <strong>'+jsonData.numberError+'</strong>', true, 'bg-danger-light');
             }
             if (!jsonData.checkArchiveSuccess) {
-                printMsg('An error happened upon compressing the directory: <strong>'+archiveName+' already exists</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon compressing the directory: <strong>'+archiveName+' already exists</strong>', true, 'bg-danger-light');
             }
         }
     })
@@ -2871,7 +2871,7 @@ var processDeleteForm = function(form) {
             } catch (e) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                printMsg('The returned value is not JSON', true, 'bg-danger-light');
                 return;
             }
 
@@ -2880,20 +2880,20 @@ var processDeleteForm = function(form) {
             if (jsonData.success) {  // if success, show the success button and message
                 $('#btnDelete').prop("disabled", false);
                 $('#btnDelete').html(defaultDoneText);
-                printMsg(entry+' deleted successfully!', true, 'bg-success-custom');
+                printMsg(entry+' deleted successfully!', true, 'bg-success-light');
             }
             else if (jsonData.error) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+                printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
             } else if (jsonData.failed_files) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('The following files and folders could not be removed: ', false, 'bg-danger-custom');
+                printMsg('The following files and folders could not be removed: ', false, 'bg-danger-light');
                 jsonData.failed_files.forEach(function(item, index, array) {
                     printMsg(item, false, null, true); // no auto-scroll, without color, small size
                 });
-                printMsg('', true, 'bg-danger-custom', true); // empty message, red color, small size
+                printMsg('', true, 'bg-danger-light', true); // empty message, red color, small size
             }
         },
         error: function (jqXHR, exception, message) {  // on error
@@ -3006,7 +3006,7 @@ var processLoginform = function(form) {
             
             handleEmptyResponse($(''), jsonData);
 
-            if (jsonData.success == "1") {
+            if (jsonData.success) {
                 location.reload(true);
             } else {
                 printMsg('Invalid password');
@@ -3054,16 +3054,16 @@ $(document).ready(function() {
         -webkit-overflow-scrolling: touch;
     }
 
-    .bg-info-custom{
+    .bg-info-light{
         background-color: #bee5eb;
     }
-    .bg-warning-custom{
+    .bg-warning-light{
         background-color: #ffeeba;
     }
-    .bg-danger-custom{
+    .bg-danger-light{
         background-color: #f5c6cb;
     }
-    .bg-success-custom{
+    .bg-success-light{
         background-color: #c3e6cb;
     }
 
@@ -3169,7 +3169,7 @@ $(document).ready(function() {
                     </form>
                 </div>
 
-                <div class="row mt-4">
+                <div class="row mt-3">
                     <form id="view-form">
                         <div class="form-group input-group">
                             <div class="input-group-prepend">
@@ -3183,7 +3183,7 @@ $(document).ready(function() {
                     </form>
                 </div>
 
-                <div class="row mt-4">
+                <div class="row mt-3">
                     <form id="delete-form">
                         <div class="form-group input-group">
                             <div class="input-group-prepend">
@@ -3199,7 +3199,7 @@ $(document).ready(function() {
 
             </div>
 
-            <div class="col-6 justify-content-start" id="right-half">
+            <div class="col-6" id="right-half">
 
                 <div class="row">
                     <div class="col">
@@ -3239,7 +3239,10 @@ $(document).ready(function() {
                     <div class="col">
                         <button type="button" class="btn btn-info" id="btnAutoLogin">Log into wp-admin</button>
                     </div>
-                    <div class="col">
+                </div>
+
+                <div class="row mt-4">                    
+                    <div class="col-md-5 offset-md-7">
                         <button type="button" class="btn btn-danger" id="btnSelfDestruct">Remove File From Server</button>
                     </div>
                 </div>
