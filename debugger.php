@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.2');
+define('VERSION', '1.3');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -961,23 +961,29 @@ function rmove($src, $dst)
 /**
  * [rrmdir removes folders and files recursively]
  * @param  string $dir [directory where files must be removed]
- * @return null
+ * @param  array $failedRemovals [array of files and folders that failed to be removed]
+ * @return array [array of files and folders that failed to be removed]
  */
-function rrmdir($dir)
+function rrmdir($dir, $failedRemovals=[])
 {
     if (is_dir($dir)) {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object != "." && $object != "..") {
                 if (is_dir($dir.DS.$object)) {
-                    rrmdir($dir.DS.$object);
+                    array_push($failedRemovals, rrmdir($dir.DS.$object, $failedRemovals)); // add new failed removals to the existing ones
                 } else {
-                    unlink($dir.DS.$object);
+                    if (!unlink($dir.DS.$object)) {
+                        array_push($failedRemovals, $dir.DS.$object);
+                    }
                 }
             }
         }
-    rmdir($dir);
+        if (!rmdir($dir)) {
+            array_push($failedRemovals, $dir);
+        }
     }
+    return $failedRemovals;
 }
 
 /**
@@ -1736,7 +1742,7 @@ if (authorized()) {
             $success = false;
             $file = false;
         }
-         die(json_encode(array('success' => $success ,
+        die(json_encode(array('success' => $success ,
                               'siteurl' => $siteUrl ,
                               'file'    => $file ,
                               'errors'  => $errors ,
@@ -1749,6 +1755,41 @@ if (authorized()) {
             die(json_encode(array('success' => true)));
         } else {
             die(json_encode(array('success' => false)));
+        }
+    }
+
+    /* deletes a file or folder from the hosting storage */
+    if (isset($_POST['delete'])) {
+        $entry = $_POST['entry'];
+        if (!file_exists($entry)) {  // if entry does not exist
+            die(json_encode(array('success' => false ,
+                                  'error' => 'No Such File' ,
+                                  'failed_files' => array() ,
+                                 )));
+        }
+        if (is_dir($entry)) {  // if entry is a directory, delete the directory recursively
+            $failedFiles = rrmdir($entry);
+            if ($failedFiles) {  // if some files/folders failed to be removed, send the list of failed removals
+                $success = false;
+            } else {
+                $success = true;
+            }
+            die(json_encode(array('success' => $success ,
+                                  'error' => '' ,
+                                  'failed_files' => $failedFiles ,
+                                 )));
+        } else {  // if entry is a file
+            if(unlink($entry)) {  // try removing the file
+                die(json_encode(array('success' => true ,
+                                      'error' => '' ,
+                                      'failed_files' => array() ,
+                                     )));
+            } else {
+                die(json_encode(array('success' => false ,
+                                      'error' => '' ,
+                                      'failed_files' => array($entry) ,
+                                     )));
+            }
         }
     }
 
@@ -1967,7 +2008,13 @@ var sendFlushRequest = function() {
         timeout: 20000,
         data: {flush: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($('#btnFlush'), jsonData);
             if (jsonData.redis_success == "1") {
                 printMsg('Redis Flushed Successfully!', false, 'bg-success-custom');
@@ -2001,7 +2048,13 @@ var sendDebugOnRequest = function() {
         timeout: 20000,
         data: {debugOn: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnDebugOn"), jsonData);
             if (jsonData.debug_on_success == "1") {
                 printMsg('Debug Enabled Successfully!', true, 'bg-success-custom');
@@ -2026,7 +2079,13 @@ var sendDebugOffRequest = function() {
         timeout: 20000,
         data: {debugOff: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnDebugOff"), jsonData);
             if (jsonData.debug_off_success == "1") {
                 printMsg('Debug Disabled Successfully!', true, 'bg-success-custom');
@@ -2058,7 +2117,14 @@ var sendReplaceRequest = function($button) {
         timeout: 300000,
         success: function(response) {
             $button.prop("disabled", false);
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $button.html(failText);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($button, jsonData, failText);
             if (jsonData.replace_success == "1") {
                 $button.html(doneText);
@@ -2094,7 +2160,14 @@ var sendActivateRequest = function($button) {
         timeout: 90000,
         success: function(response) {
             $button.prop("disabled", false);
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $button.html(failText);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($button, jsonData, failText);
             if (jsonData.replace == "1" && jsonData.activate == "1") {
                 $button.html(doneText);
@@ -2136,7 +2209,13 @@ var sendAdminerOnRequest = function() {
         data: {adminerOn: 'submit'},
         timeout: 40000,
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnAdminerOff"), jsonData);
             if (jsonData.success == "1") {
                 printMsg('Adminer Enabled Successfully!', true, 'bg-success-custom');
@@ -2162,7 +2241,13 @@ var sendAdminerOffRequest = function() {
         data: {adminerOff: 'submit'},
         timeout: 40000,
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("btnAdminerOff"), jsonData);
             if (jsonData.success == "1") {
                 printMsg('Adminer Disabled Successfully!', true, 'bg-success-custom');
@@ -2192,7 +2277,15 @@ var sendFixFilesystemRequest = function($button) {
         data: {fixFileSystem: 'submit'},
         timeout: 300000,
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $button.html(failText);
+                $button.prop("disabled", false);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($button, jsonData, failText);
             if (jsonData.success == "1") {
                 $button.html(doneText);
@@ -2219,7 +2312,13 @@ var sendFixPluginRequest = function() {
         timeout: 20000,
         data: {fixPlugin: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($('#btnFixPlugin'), jsonData);
             if (jsonData.symLink == "1") {
                 printMsg('Symlink Created Successfully!', false, 'bg-success-custom');
@@ -2249,7 +2348,13 @@ var sendDeleteAutoLoginRequest = function() {
         data: {deleteAutoLogin: 'submit'},
         timeout: 40000,
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (!jsonData.success) {
                 printMsg('Failed to remove wp-admin-auto.php. Please do it manually', true, 'bg-warning-custom');
@@ -2271,7 +2376,13 @@ var sendAutoLoginRequest = function() {
         data: {autoLogin: 'submit'},
         timeout: 40000,
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (jsonData.success) {
                 printMsg('Success! You will be redirected in a second', true, 'bg-success-custom');
@@ -2308,7 +2419,13 @@ var sendSelfDestructRequest = function() {
         timeout: 20000,
         data: {selfDestruct: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             handleEmptyResponse($("#btnSelfDestruct"), jsonData);
             if (jsonData.success == "1") {
                 printMsg('debugger.php Deleted Successfully!', true, 'bg-success-custom');
@@ -2330,7 +2447,13 @@ var sendVersionCheckRequest = function() {
         timeout: 20000,
         data: {checkVersion: 'submit'},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $("#version-fail").removeClass('d-none').addClass('show');
+                return;
+            }
             if (!$.trim(jsonData)){
                 $("#version-fail").removeClass('d-none').addClass('show');
             }
@@ -2372,7 +2495,15 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                maxUnzipTime: maxUnzipTime,
                startNum: startNum},
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $('#btnExtract').html(defaultFailText);
+                $('#btnExtract').prop("disabled", false);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
 
             handleEmptyResponse($('#btnExtract'), jsonData, defaultFailText);
 
@@ -2439,8 +2570,8 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
 var processExtractForm = function(form) {
     // preparations
     form.preventDefault();
-    var zipFile = $("#extract-form :input[name='zip-file-extract']")[0].value;
-    var destDir = $("#extract-form :input[name='dest-dir']")[0].value;
+    var zipFile = $("#zip-file-extract").val();
+    var destDir = $("#dest-dir")[0].val();
     if (!destDir) {
         destDir = '.';
     }
@@ -2471,7 +2602,15 @@ var processExtractForm = function(form) {
         data: {filesNumber: zipFile}
     })
     .done(function( response ) {
-        var jsonData = JSON.parse(response);
+        var jsonData;
+        try {
+            jsonData = JSON.parse(response);
+        } catch (e) {
+            $('#btnExtract').html(defaultFailText);
+            $('#btnExtract').prop("disabled", false);
+            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            return;
+        }
 
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
 
@@ -2500,7 +2639,15 @@ var processExtractForm = function(form) {
                destDir: destDir}
     })
     .done(function( response ) {
-        var jsonData = JSON.parse(response);
+        var jsonData;
+        try {
+            jsonData = JSON.parse(response);
+        } catch (e) {
+            $('#btnExtract').html(defaultFailText);
+            $('#btnExtract').prop("disabled", false);
+            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            return;
+        }
 
         handleEmptyResponse($('btnExtract'), jsonData, defaultFailText);
 
@@ -2531,7 +2678,7 @@ var processViewForm = function(form) {
     // preparations
     form.preventDefault();
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Loading...';
-    var archiveName = $("#view-form :input[name='zip-file-view']")[0].value;
+    var archiveName = $("#zip-file-view").val();
     $('#btnView').prop("disabled", true);
     $('#btnView').html(loadingText);
 
@@ -2541,9 +2688,17 @@ var processViewForm = function(form) {
         data: {action: 'view',
                archiveName: archiveName},
         success: function(response) {  // on success
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $('#btnView').html(defaultFailText);
+                $('#btnView').prop("disabled", false);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
 
-            handleEmptyResponse($('#view-form'), jsonData, defaultFailText);
+            handleEmptyResponse($('#btnView'), jsonData, defaultFailText);
 
             if (jsonData.success == "1") {  // if success, show the success button and message
                 $('#btnView').prop("disabled", false);
@@ -2588,7 +2743,15 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                startNum: startNum},
 
         success: function(response) {
-            var jsonData = JSON.parse(response);
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $('#btnArchive').html(defaultFailText);
+                $('#btnArchive').prop("disabled", false);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
             
             handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
                 
@@ -2629,11 +2792,11 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
 var processArchiveForm = function(form) {
     // preparations
     form.preventDefault();
-    var directory = $("#archive-form :input[name='folder-archive']")[0].value;
+    var directory = $("#folder-archive").val();
     if (!directory) {
         directory = '.';
     }
-    var archiveName = $("#archive-form :input[name='archive-name']")[0].value;
+    var archiveName = $("#archive-name").val();
     if (!archiveName) {
         if (directory == '.') {
             archiveName = getArchiveName();
@@ -2654,9 +2817,17 @@ var processArchiveForm = function(form) {
                archive: archiveName}
     })
     .done(function( response ) {
-        var jsonData = JSON.parse(response);
+        var jsonData;
+        try {
+            jsonData = JSON.parse(response);
+        } catch (e) {
+            $('#btnArchive').html(defaultFailText);
+            $('#btnArchive').prop("disabled", false);
+            printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+            return;
+        }
         
-        handleEmptyResponse($('btnArchive'), jsonData, defaultFailText);
+        handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
             
         if (jsonData.numberSuccess && jsonData.checkArchiveSuccess) {
             $("#progress-container").removeClass('d-none').addClass('show').html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
@@ -2676,6 +2847,60 @@ var processArchiveForm = function(form) {
         handleErrors(jqXHR, exception);
         $('#btnArchive').html(defaultFailText);
         $('#btnArchive').prop("disabled", false);
+    });
+};
+
+
+var processDeleteForm = function(form) {
+    // preparations
+    form.preventDefault();
+    var entry = $("#delete-entry").val();
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Deleting...';
+    $('#btnDelete').prop("disabled", true);
+    $('#btnDelete').html(loadingText);
+
+    // send request to get filenames inside zip file
+    $.ajax({
+        type: "POST",
+        data: {delete: 'submit',
+               entry: entry},
+        success: function(response) {  // on success
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                $('#btnDelete').html(defaultFailText);
+                $('#btnDelete').prop("disabled", false);
+                printMsg('The returned value is not JSON', true, 'bg-danger-custom');
+                return;
+            }
+
+            handleEmptyResponse($('#btnDelete'), jsonData, defaultFailText);
+
+            if (jsonData.success) {  // if success, show the success button and message
+                $('#btnDelete').prop("disabled", false);
+                $('#btnDelete').html(defaultDoneText);
+                printMsg(entry+' deleted successfully!', true, 'bg-success-custom');
+            }
+            else if (jsonData.error) {
+                $('#btnDelete').html(defaultFailText);
+                $('#btnDelete').prop("disabled", false);
+                printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-custom');
+            } else if (jsonData.failed_files) {
+                $('#btnDelete').html(defaultFailText);
+                $('#btnDelete').prop("disabled", false);
+                printMsg('The following files and folders could not be removed: ', false, 'bg-danger-custom');
+                jsonData.failed_files.forEach(function(item, index, array) {
+                    printMsg(item, false, null, true); // no auto-scroll, without color, small size
+                });
+                printMsg('', true, 'bg-danger-custom', true); // empty message, red color, small size
+            }
+        },
+        error: function (jqXHR, exception, message) {  // on error
+            handleErrors(jqXHR, exception);
+            $('#btnDelete').html(defaultFailText);
+            $('#btnDelete').prop("disabled", false);
+        }
     });
 };
 
@@ -2708,6 +2933,10 @@ $(document).ready(function() {
     $('#view-form').submit(function(form) {
         processViewForm(form);
     });
+
+    $('#delete-form').submit(function(form) {
+        processDeleteForm(form);
+    });    
 
     $("#btnFlush").click(function() {
         sendFlushRequest();
@@ -2906,7 +3135,7 @@ $(document).ready(function() {
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
                             </div>
-                            <input type="text" class="form-control" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip">
+                            <input type="text" class="form-control" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip" required>
 
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info ml-3">To</div>
@@ -2946,9 +3175,23 @@ $(document).ready(function() {
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info">View content of a ZIP archive</div>
                             </div>
-                            <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip">
+                            <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip" required>
                             <span class="input-group-btn ml-3">
                                 <button type="submit" class="btn btn-secondary" id="btnView">Submit</button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="row mt-4">
+                    <form id="delete-form">
+                        <div class="form-group input-group">
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">Delete folder/file</div>
+                            </div>
+                            <input type="text" class="form-control form" id="delete-entry" name="delete-file" placeholder="path/to/folder" required>
+                            <span class="input-group-btn ml-3">
+                                <button type="submit" class="btn btn-secondary" id="btnDelete">Submit</button>
                             </span>
                         </div>
                     </form>
