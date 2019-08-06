@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.3');
+define('VERSION', '1.4.1');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -392,7 +392,7 @@ class DBconn {
                                       $this->db_details['pass'],
                                       $this->db_details['name']);
         if ($this->mysqlConn->connect_errno) {
-            array_push($this->errors, "Database connection failed: " . $mysqli->connect_error);
+            array_push($this->errors, "<strong>Database connection failed:</strong> " . $this->mysqlConn->connect_error);
         } else {
             $this->connected = true;
         }
@@ -887,6 +887,13 @@ function flushRedis()
  */
 function clearAll()
 {
+    if (!file_exists('/var/www/wptbox')) {
+        return array('redis_success' => false,
+                     'varnish_success' => false,
+                     'errors' => array("It is not EasyWP, is it?"
+                    ));
+    }
+
     $redis_success = flushRedis() ? 1 : 0;
 
     $varnish_cache = new VarnishCache();
@@ -1712,6 +1719,7 @@ if (authorized()) {
 
     /* gets WordPress siteurl and upload the wp-admin-auto.php file */
     if (isset($_POST['autoLogin'])) {
+
         // get site URL
         $dbConn = new DBconn;
         if (!$dbConn->errors) {
@@ -1721,27 +1729,23 @@ if (authorized()) {
             $siteUrl = '';
             $errors = $dbConn->errors;
         }
-         // if there is site URL, proceed with uploading the wp-admin-auto file
+
+        // if there is site URL, proceed with uploading the wp-admin-auto file
         if ($siteUrl) {
             $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
                                               );
-            if (uploadFiles($autoLoginFilesAndSources)) {
-                $autoLoginfile = true;
+            if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
+                $success = true;  
+                $file = true;
             } else {
-                $autoLoginfile = false;
+                $success = false;
+                $file = false;
             }
         } else {
             $success = false;
-            $file = false;
+            $file = null;  // didn't try to upload the file at all
         }
-         // if there is site URL and the file is uploaded successfully, everything is good
-        if ($autoLoginfile) {
-            $success = true;
-            $file = true;
-        } else {
-            $success = false;
-            $file = false;
-        }
+
         die(json_encode(array('success' => $success ,
                               'siteurl' => $siteUrl ,
                               'file'    => $file ,
@@ -2390,7 +2394,7 @@ var sendAutoLoginRequest = function() {
                 setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
-                if (!jsonData.file) {
+                if (jsonData.file === false) {  // it can also be true and null
                     printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-light'); 
                 }   
                 if (!jsonData.siteurl) {    
