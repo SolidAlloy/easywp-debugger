@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.4.1');
+define('VERSION', '1.3.1');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -2885,8 +2885,7 @@ var processDeleteForm = function(form) {
                 $('#btnDelete').prop("disabled", false);
                 $('#btnDelete').html(defaultDoneText);
                 printMsg(entry+' deleted successfully!', true, 'bg-success-light');
-            }
-            else if (jsonData.error) {
+            } else if (jsonData.error) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
                 printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
