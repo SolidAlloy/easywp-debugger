@@ -1885,7 +1885,7 @@ var handleEmptyField = function(fieldValue) {
 /**
  * [handleEmptyResponse shows warning if no JSON was found in the response]
  * @param  {object} $button  [button which state should be changed to failed]
- * @param  {object} jsonData [parsend json string]
+ * @param  {object} jsonData [parsed json string]
  * @param  {string} failText [text to insert into the button]
  * @return {null}
  */
