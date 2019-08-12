@@ -2579,7 +2579,7 @@ var processExtractForm = function(form) {
     if (!destDir) {
         destDir = '.';
     }
-    var defaultTimeLimit = 130; // 140-second limit raises 503 frequently on EasyWP in my experience
+    var defaultTimeLimit = 60; // a higher limit raises 503 frequently on EasyWP in my experience
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Extracting...';
     $('#btnExtract').prop("disabled", true);
     $('#btnExtract').html(loadingText);
