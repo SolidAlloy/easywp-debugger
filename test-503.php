@@ -79,6 +79,8 @@ if (isset($_POST['filecheck'])) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.min.js"></script>
 
 <script>
+/*jshint esversion: 6 */
+
 // global values
 var errorTimeStamps = [];
 var color = Chart.helpers.color;
@@ -206,16 +208,17 @@ var sendFileCheckRequest = function(number, timeLimit, testIndex, testsTotal) {
                 var counter = 0;
                 var realIndex;
                 jsonData.files.forEach(function(item, index, array) {
-                    if (Number(item) == timeLimit) {
+                    if (Number(item) == timeLimit) {  // if the time in files is equal to the time limit, add them to the counter
                         ++counter;
-                    } else if (item === false) {
+                    } else if (item === false) {  // if the file was not open, it means the request didn't start running
                         realIndex = index+1;
                         printMsg('Request #'+realIndex+' did not start running .', true, 'bg-warning-light');
-                    } else {
+                    } else {  // if the time in a file is not equal to the time limit, print a message about it
                         realIndex = index+1;
                         printMsg('Request #'+realIndex+' was running for '+item+' seconds on the backend.', true, 'bg-info-light');
                     }
                 });
+                // print a message about all the successful requests based on the counter value
                 if (counter == number) {
                     printMsg('All requests were running for '+timeLimit+' seconds on the backend.', true, 'bg-success-light');
                 } else {
@@ -231,7 +234,7 @@ var sendFileCheckRequest = function(number, timeLimit, testIndex, testsTotal) {
             if (testIndex == testsTotal) {
                 printMsg('All tests have been completed.', true, 'bg-success-light');
             } else {
-                performTest(number, timeLimit, testIndex+1, testsTotal);
+                performTest(number, timeLimit, testIndex+1, testsTotal);  // start the next test and increment testIndex 
             }
         }
     });
@@ -310,7 +313,7 @@ var getGroups = function() {
                  };
 
     errorTimeStamps.forEach(function(item, index, array) {
-        var rounded = round20(item);  // round to 10
+        var rounded = round20(item);
         ++groups[rounded];  // increase the number in the matching group
     });
     return groups;
@@ -318,32 +321,39 @@ var getGroups = function() {
 
 /**
  * Creates a data object for the chart
+ * 
  * @return {object} chart data
  */
 var getChartData = function() {
     var groups = getGroups();
     var horizontalBarChartData = {
-        labels: Object.keys(groups),
+        labels: Object.keys(groups),  // time groups like 10, 20, etc.
         datasets: [{
             label: '',
             backgroundColor: color(blue).alpha(0.5).rgbString(),
             borderColor: blue,
             borderWidth: 1,
-            data: Object.values(groups)
+            data: Object.values(groups)  // values of each group
         }]
 
     };
     return horizontalBarChartData;
 };
 
-
+/**
+ * Creates a canvas element next to the progress log
+ * @return {null}
+ */
 var createCanvas = function() {
     secondRow = $('#second-row');
     secondRow.append('<div class="col-6"><canvas id="canvas"></canvas></div>');
     secondRow.removeClass('justify-content-center');
 };
 
-
+/**
+ * Takes data from errorTimeStamps and creates a new chart on the canvas
+ * @return {null}
+ */
 var printChart = function() {
     createCanvas();
     var ctx = document.getElementById('canvas').getContext('2d');
@@ -372,7 +382,7 @@ var printChart = function() {
                         labelString: 'number of requests in a time group',
                     },
                     ticks: {
-                        callback: function(value) {if (value % 1 === 0) {return value;}}
+                        callback: function(value) {if (value % 1 === 0) {return value;}}  // use only integers on the X axis
                     }
                 }],
             },
@@ -380,29 +390,47 @@ var printChart = function() {
     });
 };
 
-
+/**
+ * Updates a chart with the new data
+ * 
+ * @return {null}
+ */
 var updateChart = function() {
     window.requestsChart.data = getChartData();
     window.requestsChart.update();
 };
 
-
+/**
+ * Performs a single test: makes a number of requests and checks their completion in 5 minutes
+ * 
+ * @param  {integer} number     Total number of requests
+ * @param  {integer} timeLimit  Time limit of each request
+ * @param  {integer} testIndex  Index of the test going on
+ * @param  {integer} testsTotal Total number of tests that have to be run
+ * @return {null}
+ */
 var performTest = function(number, timeLimit, testIndex, testsTotal) {
     for (const x of Array(number).keys()) {
         sendDummyRequest(x+1, timeLimit);
     }
 
-    printMsg('<strong>Test #'+testIndex+'</strong>: Requests have been sent. Please wait for the test completion in 300 seconds', true, 'bg-info-light');
+    printMsg('<strong>Test #'+testIndex+'</strong>: Requests have been sent. Please wait for the test completion in 5 minutes', true, 'bg-info-light');
 
-    setTimeout(function() { sendFileCheckRequest(number, timeLimit, testIndex, testsTotal); }, 301000);  // send file-check request in 301 seconds
+    setTimeout(function() { sendFileCheckRequest(number, timeLimit, testIndex, testsTotal); }, 304000);  // send file-check request in 304 seconds
+    // show percentage of requests in the chart in 301 seconds
     if (window.requestsChart) {
         setTimeout(function() { updateChart(); }, 301000);
     } else {
-        setTimeout(function() { printChart(); }, 301000);  // show percentage of requests in 301 seconds
+        setTimeout(function() { printChart(); }, 301000);
     }
 };
 
-
+/**
+ * Gets values from the form and starts the first test
+ * 
+ * @param  {object} form Form to get values from
+ * @return {null}
+ */
 var processDummyForm = function(form) {
     form.preventDefault();
     var number = Number($("#index").val());
