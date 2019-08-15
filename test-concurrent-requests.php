@@ -77,14 +77,17 @@ if (isset($_POST['filecheck'])) {
 <script src="https://code.jquery.com/jquery-3.4.0.min.js" integrity="sha256-BJeo0qm959uMBGb65z40ejJYGSgR7REI4+CW1fNKwOg=" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/json-url@2.4.2/dist/browser/json-url-single.js"></script>
 
 <script>
 /*jshint esversion: 6 */
 
 // global values
 var errorTimeStamps = [];
+var inputValues = {};  // if the dummy form is submitted, its values are stored here to be used in the pageToJSON() function later
 var color = Chart.helpers.color;
 var blue = 'rgb(54, 162, 235)';
+var queryString;
 
 /**
  * Outputs given text in the progress log if the user is authorized. It has two versions for
@@ -104,10 +107,23 @@ var printMsg = function(msg, scroll, color, small) {
     if (small) {
         liString = '<li class="list-group-item '+color+'" style="height: 30px; padding-top: 0px; padding-bottom: 0px;"><small>'+msg+'</small></li>';
     } else {
-        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px;">'+msg+'</li>';
+        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px; white-space: nowrap;">'+msg+'</li>';
     }
 
     $('#progress-log').append(liString);
+    
+    if (!small) {
+        // make the text block higher if the text is wrapped to multiple lines
+        lastLi = $('#progress-log > li').last();
+        if (lastLi[0].scrollWidth > lastLi.innerWidth()) {
+            var additionalRows = Math.floor( lastLi[0].scrollWidth / lastLi.innerWidth() );
+            lastLi.css({
+                "white-space": "normal",
+                "word-wrap": "break-word",
+                "height": (40+27*additionalRows).toString()+"px",
+            });
+        }
+    }
 
     if (scroll) {
         var progressLog = document.getElementById("progress-log");
@@ -324,10 +340,11 @@ var getGroups = function() {
  * 
  * @return {object} chart data
  */
-var getChartData = function() {
-    var groups = getGroups();
+var getChartData = function(groups) {
+    groups = groups || getGroups();
+
     var horizontalBarChartData = {
-        labels: Object.keys(groups),  // time groups like 10, 20, etc.
+        labels: Object.keys(groups).reverse(),  // time groups like 10, 20, etc.
         datasets: [{
             label: '',
             backgroundColor: color(blue).alpha(0.5).rgbString(),
@@ -341,12 +358,26 @@ var getChartData = function() {
 };
 
 /**
- * Creates a canvas element next to the progress log
+ * Creates a canvas element next to the progress log and two buttons below
  * @return {null}
  */
 var createCanvas = function() {
     secondRow = $('#second-row');
-    secondRow.append('<div class="col-6"><canvas id="canvas"></canvas></div>');
+    secondRow.append(
+        `<div class="col-6">
+            <div class="row">
+                <canvas id="canvas"></canvas>
+            </div>
+            <div class="row mt-5">
+                <div class="col-6 text-center">
+                    <button type="button" class="btn btn-info" id="btnShare"><i class="fas fa-share-alt"></i> Share Result</button>
+                </div>
+                <div class="col-6 text-center">
+                    <button type="button" class="btn btn-info d-none" id="btnCopy"><i class="far fa-copy"></i> Copy Link</button>
+                </div>
+            </div>
+        </div>`
+        );
     secondRow.removeClass('justify-content-center');
 };
 
@@ -354,12 +385,13 @@ var createCanvas = function() {
  * Takes data from errorTimeStamps and creates a new chart on the canvas
  * @return {null}
  */
-var printChart = function() {
+var printChart = function(groups) {
+    groups = groups || null;
     createCanvas();
     var ctx = document.getElementById('canvas').getContext('2d');
     window.requestsChart = new Chart(ctx, {
         type: 'horizontalBar',
-        data: getChartData(),
+        data: getChartData(groups),
         options: {
             responsive: true,
             legend: {
@@ -374,7 +406,7 @@ var printChart = function() {
                     scaleLabel: {
                         display: true,
                         labelString: 'time in seconds',
-                    }
+                    },
                 }],
                 xAxes: [{
                     scaleLabel: {
@@ -383,10 +415,10 @@ var printChart = function() {
                     },
                     ticks: {
                         callback: function(value) {if (value % 1 === 0) {return value;}}  // use only integers on the X axis
-                    }
+                    },
                 }],
             },
-        }
+        },
     });
 };
 
@@ -433,17 +465,92 @@ var performTest = function(number, timeLimit, testIndex, testsTotal) {
  */
 var processDummyForm = function(form) {
     form.preventDefault();
-    var number = Number($("#index").val());
+    var number = Number($("#requests-number").val());
     var timeLimit = Number($("#time-limit").val());
-    var testsTotal = Number($("#times-number").val());
+    var testsTotal = Number($("#tests-total").val());
+    inputValues = {
+        number: number,
+        timeLimit: timeLimit,
+        testsTotal: testsTotal,
+    };
 
     performTest(number, timeLimit, 1, testsTotal);
+};
+
+/**
+ *  Copies the given text to clipboard
+ * 
+ * @param  {string} string Text to copy to clipboard
+ * @param  {object} $btn   Button to show success on
+ * @return {null}
+ */
+var copyToClipboard = function(string, $btn) {
+    var tempInput = document.createElement("input");
+    tempInput.style = "position: absolute; left: -1000px; top: -1000px";
+    tempInput.value = window.location.href+'?data='+string;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand("copy");
+    document.body.removeChild(tempInput);
+    $btn.removeClass('btn-info').addClass('btn-success').html('<i class="fas fa-check fa-fw"></i> Copied');
+};
+
+/**
+ * Saves data on the page to a JSON object
+ * 
+ * @return {object} JSON object with the current data of the page
+ */
+var pageToJSON = function() {
+    var jsonData = {
+        progressLog: $('#progress-log').html(),
+        input: inputValues,
+        groups: getGroups(),
+    };
+
+    return jsonData;
+};
+
+/**
+ * Generates a compressed JSON string to use in links
+ * 
+ * @return {null}
+ */
+var getLink = function() {
+    const jsonCompressor = JsonUrl('lzma');  // a library to compress and decompress json from URL string
+    jsonCompressor.compress(pageToJSON()).then(compressedString => {
+        printMsg('Success. Feel free to copy the link.', true, 'bg-success-light');
+        queryString = compressedString;
+        $('#btnCopy').removeClass('d-none');
+    });
+};
+
+/**
+ * Decompresses the JSON object from the query string and puts its content on the page
+ * @param  {string} compressedData String containing the compressed JSON
+ * @return {null}
+ */
+var showData = function(compressedData) {
+    const jsonCompressor = JsonUrl('lzma');  // a library to compress and decompress json from URL string
+    jsonCompressor.decompress(compressedData).then(jsonData => {
+        $('#progress-log').append(jsonData.progressLog);
+        $('#requests-number').val(jsonData.input.number);
+        $('#time-limit').val(jsonData.input.timeLimit);
+        $('#tests-total').val(jsonData.input.testsTotal);
+        printChart(jsonData.groups);
+    });
 };
 
 
 $(document).ready(function() {
 
-    setMaxheight();
+    setMaxheight();  // set max height for progress log
+
+    // show data on the page is there is data in the query string
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('data')) {
+        var compressedData = urlParams.get('data');
+        showData(compressedData);
+    }
 
     $(window).resize(function(){
         setMaxheight();
@@ -453,6 +560,15 @@ $(document).ready(function() {
         processDummyForm(form);
     });
 });
+
+$(document).on("click", "#btnShare" , function() {
+    getLink();
+});
+
+$(document).on("click", "#btnCopy" , function() {
+    copyToClipboard(queryString, $('#btnCopy'));
+});
+
 
 </script>
 
@@ -545,7 +661,7 @@ $(document).ready(function() {
                     <div class="input-group-prepend">
                         <div class="input-group-text input-group-text-info">Send</div>
                     </div>
-                    <input type="text" class="form-control col-1" id="index" name="requests-number" placeholder="5" required>
+                    <input type="text" class="form-control col-1" id="requests-number" name="requests-number" placeholder="5" required>
                     <div class="input-group-append">
                         <div class="input-group-text input-group-text-info">requests</div>
                     </div>
@@ -561,7 +677,7 @@ $(document).ready(function() {
                     <div class="input-group-prepend">
                         <div class="input-group-text input-group-text-info ml-3">and run the test</div>
                     </div>
-                    <input type="text" class="form-control col-1" id="times-number" name="times-number" placeholder="3" required>
+                    <input type="text" class="form-control col-1" id="tests-total" name="tests-total" placeholder="3" required>
                     <div class="input-group-append">
                         <div class="input-group-text input-group-text-info">times</div>
                     </div>
