@@ -1833,10 +1833,23 @@ var printMsg = function(msg, scroll, color, small) {
     if (small) {
         liString = '<li class="list-group-item '+color+'" style="height: 30px; padding-top: 0px; padding-bottom: 0px;"><small>'+msg+'</small></li>';
     } else {
-        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px;">'+msg+'</li>';
+        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px; white-space: nowrap;">'+msg+'</li>';
     }
 
     $('#progress-log').append(liString);
+    
+    if (!small) {
+        // make the text block higher if the text is wrapped to multiple lines
+        lastLi = $('#progress-log > li').last();
+        if (lastLi[0].scrollWidth > lastLi.innerWidth()) {
+            var additionalRows = Math.floor( lastLi[0].scrollWidth / lastLi.innerWidth() );
+            lastLi.css({
+                "white-space": "normal",
+                "word-wrap": "break-word",
+                "height": (40+27*additionalRows).toString()+"px",
+            });
+        }
+    }
 
     if (scroll) {
         var progressLog = document.getElementById("progress-log");
