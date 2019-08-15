@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.4.1');
+define('VERSION', '1.3.1');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -1833,10 +1833,23 @@ var printMsg = function(msg, scroll, color, small) {
     if (small) {
         liString = '<li class="list-group-item '+color+'" style="height: 30px; padding-top: 0px; padding-bottom: 0px;"><small>'+msg+'</small></li>';
     } else {
-        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px;">'+msg+'</li>';
+        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px; white-space: nowrap;">'+msg+'</li>';
     }
 
     $('#progress-log').append(liString);
+    
+    if (!small) {
+        // make the text block higher if the text is wrapped to multiple lines
+        lastLi = $('#progress-log > li').last();
+        if (lastLi[0].scrollWidth > lastLi.innerWidth()) {
+            var additionalRows = Math.floor( lastLi[0].scrollWidth / lastLi.innerWidth() );
+            lastLi.css({
+                "white-space": "normal",
+                "word-wrap": "break-word",
+                "height": (40+27*additionalRows).toString()+"px",
+            });
+        }
+    }
 
     if (scroll) {
         var progressLog = document.getElementById("progress-log");
@@ -1885,7 +1898,7 @@ var handleEmptyField = function(fieldValue) {
 /**
  * [handleEmptyResponse shows warning if no JSON was found in the response]
  * @param  {object} $button  [button which state should be changed to failed]
- * @param  {object} jsonData [parsend json string]
+ * @param  {object} jsonData [parsed json string]
  * @param  {string} failText [text to insert into the button]
  * @return {null}
  */
@@ -2579,7 +2592,7 @@ var processExtractForm = function(form) {
     if (!destDir) {
         destDir = '.';
     }
-    var defaultTimeLimit = 130; // 140-second limit raises 503 frequently on EasyWP in my experience
+    var defaultTimeLimit = 60; // a higher limit raises 503 frequently on EasyWP in my experience
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Extracting...';
     $('#btnExtract').prop("disabled", true);
     $('#btnExtract').html(loadingText);
@@ -2885,8 +2898,7 @@ var processDeleteForm = function(form) {
                 $('#btnDelete').prop("disabled", false);
                 $('#btnDelete').html(defaultDoneText);
                 printMsg(entry+' deleted successfully!', true, 'bg-success-light');
-            }
-            else if (jsonData.error) {
+            } else if (jsonData.error) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
                 printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
