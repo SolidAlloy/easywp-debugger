@@ -83,10 +83,13 @@ if (isset($_POST['filecheck'])) {
 /*jshint esversion: 6 */
 
 // global values
-var errorTimeStamps = [];
+var errorTimeStamps = [];  // timestamps of the requests that failed and returned an error
+var warningTimeStamps = [];  // timestamps of the requests that didn't fail but haven't finished on the backend either
 var inputValues = {};  // if the dummy form is submitted, its values are stored here to be used in the pageToJSON() function later
 var color = Chart.helpers.color;
-var blue = 'rgb(54, 162, 235)';
+// var blue = 'rgb(54, 162, 235)';
+var red = 'rgb(255, 99, 132)';
+var yellow = 'rgb(255, 205, 86)';
 var queryString;
 
 /**
@@ -228,10 +231,11 @@ var sendFileCheckRequest = function(number, timeLimit, testIndex, testsTotal) {
                         ++counter;
                     } else if (item === false) {  // if the file was not open, it means the request didn't start running
                         realIndex = index+1;
-                        printMsg('Request #'+realIndex+' did not start running .', true, 'bg-warning-light');
+                        printMsg('Request #'+realIndex+' did not start running on the backend.', true, 'bg-warning-light');
                     } else {  // if the time in a file is not equal to the time limit, print a message about it
                         realIndex = index+1;
-                        printMsg('Request #'+realIndex+' was running for '+item+' seconds on the backend.', true, 'bg-info-light');
+                        warningTimeStamps.push(item);
+                        printMsg('Request #'+realIndex+' was running for '+item+' seconds on the backend.', true, 'bg-warning-light');
                     }
                 });
                 // print a message about all the successful requests based on the counter value
@@ -247,8 +251,14 @@ var sendFileCheckRequest = function(number, timeLimit, testIndex, testsTotal) {
             handleErrors(jqXHR, exception, 'FileCheck', completeTime);
         },
         complete: function() {
+            // show percentage of requests in the chart
+            if (window.requestsChart) {
+                updateChart();
+            } else {
+                printChart();
+            }
             if (testIndex == testsTotal) {
-                printMsg('All tests have been completed.', true, 'bg-success-light');
+                printMsg('All '+testsTotal+' tests have been completed.', true, 'bg-success-light');
             } else {
                 performTest(number, timeLimit, testIndex+1, testsTotal);  // start the next test and increment testIndex 
             }
@@ -309,7 +319,11 @@ var round20 = function(num) {
  * 
  * @return {ojbect} [dictionary with timestamps grouped by lengths]
  */
-var getGroups = function() {
+var getGroups = function(timeStamps) {
+    if (timeStamps == warningTimeStamps) {
+
+    }
+
     var groups = {0: 0,
                   20: 0,
                   40: 0,
@@ -328,7 +342,7 @@ var getGroups = function() {
                   300: 0,
                  };
 
-    errorTimeStamps.forEach(function(item, index, array) {
+    timeStamps.forEach(function(item, index, array) {
         var rounded = round20(item);
         ++groups[rounded];  // increase the number in the matching group
     });
@@ -340,19 +354,28 @@ var getGroups = function() {
  * 
  * @return {object} chart data
  */
-var getChartData = function(groups) {
-    groups = groups || getGroups();
+var getChartData = function(errorGroups, warningGroups) {
+    errorGroups = errorGroups || getGroups(errorTimeStamps);
+    warningGroups = warningGroups || getGroups(warningTimeStamps);
 
     var horizontalBarChartData = {
-        labels: Object.keys(groups).reverse(),  // time groups like 10, 20, etc.
-        datasets: [{
-            label: '',
-            backgroundColor: color(blue).alpha(0.5).rgbString(),
-            borderColor: blue,
-            borderWidth: 1,
-            data: Object.values(groups)  // values of each group
-        }]
-
+        labels: Object.keys(errorGroups).reverse(),  // time groups like 10, 20, etc.
+        datasets: [
+            {
+                label: 'requests failed on frontend',
+                backgroundColor: color(red).alpha(0.5).rgbString(),
+                borderColor: red,
+                borderWidth: 1,
+                data: Object.values(errorGroups).reverse(),  // values of each group
+            },
+            {
+                label: 'requests failed on backend',
+                backgroundColor: color(yellow).alpha(0.5).rgbString(),
+                borderColor: yellow,
+                borderWidth: 1,
+                data: Object.values(warningGroups).reverse(),  // values of each group
+            },
+        ],
     };
     return horizontalBarChartData;
 };
@@ -385,13 +408,14 @@ var createCanvas = function() {
  * Takes data from errorTimeStamps and creates a new chart on the canvas
  * @return {null}
  */
-var printChart = function(groups) {
-    groups = groups || null;
+var printChart = function(errorGroups, warningGroups) {
+    errorGroups = errorGroups || null;
+    warningGroups = warningGroups || null;
     createCanvas();
     var ctx = document.getElementById('canvas').getContext('2d');
     window.requestsChart = new Chart(ctx, {
         type: 'horizontalBar',
-        data: getChartData(groups),
+        data: getChartData(errorGroups, warningGroups),
         options: {
             responsive: true,
             legend: {
@@ -449,12 +473,6 @@ var performTest = function(number, timeLimit, testIndex, testsTotal) {
     printMsg('<strong>Test #'+testIndex+'</strong>: Requests have been sent. Please wait for the test completion in 5 minutes', true, 'bg-info-light');
 
     setTimeout(function() { sendFileCheckRequest(number, timeLimit, testIndex, testsTotal); }, 304000);  // send file-check request in 304 seconds
-    // show percentage of requests in the chart in 301 seconds
-    if (window.requestsChart) {
-        setTimeout(function() { updateChart(); }, 301000);
-    } else {
-        setTimeout(function() { printChart(); }, 301000);
-    }
 };
 
 /**
@@ -468,13 +486,19 @@ var processDummyForm = function(form) {
     var number = Number($("#requests-number").val());
     var timeLimit = Number($("#time-limit").val());
     var testsTotal = Number($("#tests-total").val());
-    inputValues = {
-        number: number,
-        timeLimit: timeLimit,
-        testsTotal: testsTotal,
-    };
 
-    performTest(number, timeLimit, 1, testsTotal);
+    if (isNaN(number) || isNaN(timeLimit) || isNaN(testsTotal)) {
+        printMsg('Input correct numbers in the fields.', true, 'bg-danger-light');
+    } else {
+        inputValues = {
+            number: number,
+            timeLimit: timeLimit,
+            testsTotal: testsTotal,
+        };
+
+        performTest(number, timeLimit, 1, testsTotal);
+    }
+
 };
 
 /**
@@ -504,7 +528,8 @@ var pageToJSON = function() {
     var jsonData = {
         progressLog: $('#progress-log').html(),
         input: inputValues,
-        groups: getGroups(),
+        errorGroups: getGroups(errorTimeStamps),
+        warningGroups: getGroups(warningTimeStamps),
     };
 
     return jsonData;
@@ -536,7 +561,7 @@ var showData = function(compressedData) {
         $('#requests-number').val(jsonData.input.number);
         $('#time-limit').val(jsonData.input.timeLimit);
         $('#tests-total').val(jsonData.input.testsTotal);
-        printChart(jsonData.groups);
+        printChart(jsonData.errorGroups, jsonData.warningGroups);
     });
 };
 
