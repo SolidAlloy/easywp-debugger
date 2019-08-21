@@ -3253,13 +3253,13 @@ $(document).ready(function() {
                         <button type="button" class="btn btn-info" id="btnFixPlugin">Fix EasyWP Plugin</button>
                     </div>
                     <div class="col">
-                        <button type="button" class="btn btn-info" id="btnAutoLogin">Log into wp-admin</button>
+                        <button type="button" class="btn btn-info" id="btnAutoLogin"><i class="fas fa-user"></i> Log into wp-admin</button>
                     </div>
                 </div>
 
                 <div class="row mt-4">                    
                     <div class="col-md-5 offset-md-7">
-                        <button type="button" class="btn btn-danger" id="btnSelfDestruct">Remove File From Server</button>
+                        <button type="button" class="btn btn-danger" id="btnSelfDestruct"><i class="fas fa-trash"></i> Remove File From Server</button>
                     </div>
                 </div>
 

@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Test Layout</title>
+    <meta charset="utf-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css">
+<!-- Bootstrap core CSS -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+<!-- Material Design Bootstrap -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.8.8/css/mdb.min.css" rel="stylesheet">
+
+<!-- JQuery -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<!-- Bootstrap tooltips -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.4/umd/popper.min.js"></script>
+<!-- Bootstrap core JavaScript -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+
+<script type="text/javascript">
+var colors = {
+    navLight: '#cbdce9',
+    navDark: '#abc7dd',
+};
+
+/**
+ * [prependZero puts 0 before the number if it is less than 10. Doesn't work on numbers above 99]
+ * @param  {integer} num [number where 0 should be put]
+ * @return {string}     [number with 0 at the beginning]
+ */
+var prependZero = function(num) {
+    return ('0' + num).slice(-2);
+};
+
+/**
+ * [getArchiveName generates a default name of the archive to create]
+ * @return {string} [generated name of the archive]
+ */
+var getArchiveName = function() {
+    var currentDate = new Date();
+    var date = prependZero(currentDate.getDate());
+    var month = prependZero(currentDate.getMonth() + 1);
+    var year = currentDate.getFullYear();
+    var hour = prependZero(currentDate.getHours());
+    var minute = prependZero(currentDate.getMinutes());
+    var second = prependZero(currentDate.getSeconds());
+
+    archiveName = "wp-files_"+year+"-"+month+"-"+date+"_"+hour+":"+minute+":"+second+".zip";
+    return archiveName;
+};
+
+/**
+ * [setMaxheight sets maximum height of progress log so that it always stays within the window]
+ */
+var setMaxheight = function(){
+    var progressLog = $("#progress-log");
+    var winHeight = $(window).height();
+    winHeight -= 400;
+    progressLog.css({'max-height' : winHeight + "px"});
+};
+
+
+$(document).ready(function() {
+
+    $('#easywp-tab').on("click", function() {
+        $('#easywp-icon-path').css({ fill: colors.navDark });
+    });
+
+    //  "on focusout" doesn't work properly in all cases, so this is a woraround
+    $('.nav-link').not('#easywp-tab').on("click", function() {
+        $('#easywp-icon-path').css({ fill: colors.navLight });
+        $(this).attr({
+            'aria-selected': 'false',
+        });
+        $(this).parent().removeClass('active');
+    });
+
+    // default "active" removal got broken for hamburger meu for some reason
+    $('.nav-link').on("click", function() {
+        $('.animated-ham-icon').toggleClass('open');  // the navbar will collapse because of data-toggle="collapse" but bootstrap doesn't handle animated buttons, so this it has to be animated manually
+
+        $otherLinks = $('.nav-link').not(this);
+
+        $otherLinks.attr({
+            'aria-selected': 'false',
+        });
+
+        $otherLinks.parent().removeClass('active');
+        $otherLinks.removeClass('active');
+    });
+
+    setMaxheight();
+
+    $(window).resize(function(){
+        setMaxheight();
+    });
+
+    $('#archive-name').val(getArchiveName());  // show default name of a backup in the field
+
+    $("#folder-archive").on("input", function(){
+        var $archiveField = $("#archive-name");
+        var folder = $(this).val();
+        if (folder) {
+            $archiveField.val(folder+'.zip');  // change the name of archive making it similar to the name of directory
+        } else {
+            $archiveField.val(getArchiveName());  // show default name of a backup in the field
+        }
+    });
+
+    $('.navbar-toggler').on('click', function () {
+        $('.animated-ham-icon').toggleClass('open');
+    });
+
+
+
+});
+
+</script>
+
+
+<style type="text/css">
+
+    :root {
+        --nav-light: #cbdce9;
+        --nav-dark: #abc7dd;
+        --stylish-light: #cbdce9;
+        --unique-light: #eaf1f6;
+        --stylish-red: #D36582;
+        --red-light: #fbf2f4;
+        --stylish-warning: #ecd779;
+        --stylish-success: #b7e783;
+        --stylish-color-active: #5E626E;
+    }
+
+
+    .tab-content {
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 50px;
+        padding-right: 50px;
+    }
+
+    .nav-link {
+        padding: .5rem 0px;
+    }
+
+    .navbar-dark .navbar-nav .nav-link {
+        color: var(--nav-dark);
+    }
+
+    .nav-tabs {  /* override default MDBootstrap behavior */
+        border-bottom: 0;
+    }
+
+    @media screen and (min-width: 1340px) {  /* for desktop navbar */
+        .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+            color: var(--nav-dark);
+            background-color: transparent;
+            border-color: transparent transparent var(--nav-dark);
+            border-bottom: 4px solid !important;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .nav-tabs .nav-link {
+            border: 1px solid transparent;
+            border-top-left-radius: .25rem;
+            border-top-right-radius: .25rem;
+            color: var(--nav-light);
+            font-size: 20px;
+        }
+
+        .nav-tabs .nav-link:focus, .nav-tabs .nav-link:hover {  /* override default MDBootstrap behavior */
+            border-color: transparent;
+        }
+
+    }
+
+    @media screen and (max-width: 1340px) {  /* for hamburger navbar */
+        /* override default MDBootstrap behavior: remove radius and white border at the bottom */
+        .nav-tabs .nav-link {
+            border: none;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+        }
+        
+        /* default color of all menu items */
+        .navbar-brand-span, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
+            color: var(--nav-light);
+        }
+        
+        /* switch to darker color on hover for the active menu item */
+        .navbar.navbar-dark .navbar-nav .nav-item.active>span>.nav-link:hover {
+            color: var(--nav-dark);
+        }
+        
+        /* switch to darker color on hover for all other (inactive) menu items */
+        .navbar.navbar-dark .navbar-nav .nav-item>span>.nav-link:hover {
+            color: var(--nav-dark);
+        }
+        
+        /* override animation (default color is white for MDBootstrap) */
+        .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
+            transition-property: all;
+            transition-duration: 0.35s;
+            transition-timing-function: ease;
+            transition-delay: 0s;
+        }
+
+        /* make background color lighter for the active item */
+        .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+            background-color: var(--stylish-color-active);
+        }
+
+    }
+
+    /**
+     * Style for the svg icon which is the only one different from the other icons 
+     * the were downloaded from awesomefont. These style block makes it similar to 
+     * the awesomefont icons.
+     */
+    .icon-easywp {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        stroke-width: 0;
+        stroke: currentColor;
+        fill: currentColor;
+        margin-bottom: 3px;  /* this margin lines up the icon with awesomefont icons */
+        margin-left: 3px;
+    }
+
+    .btn-nav {
+        padding: .42rem 1.07rem;
+    }
+
+    .btn.stylish-color {
+        color: var(--stylish-light);
+    }
+
+    .btn.unique-color {
+        color: var(--unique-light);
+    }
+
+    .btn-red {
+        background-color: var(--stylish-red);
+        color: var(--red-light);
+    }
+
+    .btn.stylish-warning {
+        background-color: var(--stylish-warning);
+        color: var(--stylish-color);
+    }
+
+    .btn.stylish-success {
+        background-color: var(--stylish-success);
+        color: var(--stylish-color);
+    }
+
+    .input-group-text-info {
+        background-color: var(--stylish-light);
+        border: 1px solid var(--nav-dark);
+    }
+
+    .btn.btn-form {
+        margin-bottom: 0rem;
+        margin-left: 0rem;
+        margin-right: 0rem;
+        margin-top: 1rem;
+        font-size: .81rem;
+        padding: .6rem 1.6rem;
+    }
+
+    .input-group-prepend, .form-control {
+        margin-top: 1rem;
+    }
+
+    .p-col {  /* makes the same padding as the col class */
+
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    input {
+        min-width: 150px;
+    }
+
+    .input-group {
+        margin-top: 1rem;
+    }
+
+    @media screen and (max-width: 1340px) {
+        .hide-backups {
+            display: none !important;
+        }
+    }
+
+    /* custom queries*/
+
+    .col-xl-smaller-6, .col-xl-smaller-12 {
+        position: relative;
+        width: 100%;
+        padding-right: 15px;
+        padding-left: 15px;
+    }
+
+    @media screen and (min-width: 1132px) {
+        .col-xl-smaller-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+
+        .col-xl-smaller-12 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+    }
+
+    /* decrease paddings in two times once adminer button don't fit into the screen width */
+    @media screen and (max-width: 400px) {
+        .btn {
+            padding: .42rem 1.07rem;
+        }
+    }
+
+    /* group button on the easywp tab into a column once they are not fit into one row */
+    @media screen and (max-width: 553px) {
+        .easywp-row {
+            flex-direction: column;
+        }
+    }
+
+    /* end of custom queries */
+
+
+    /* hamburger animation */
+
+    .animated-ham-icon {
+        width: 30px;
+        height: 20px;
+        position: relative;
+        margin: 0px;
+        -webkit-transform: rotate(0deg);
+        -moz-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+        -webkit-transition: .5s ease-in-out;
+        -moz-transition: .5s ease-in-out;
+        -o-transition: .5s ease-in-out;
+        transition: .5s ease-in-out;
+        cursor: pointer;
+    }
+
+    .animated-ham-icon span {
+        display: block;
+        position: absolute;
+        height: 3px;
+        width: 100%;
+        border-radius: 9px;
+        opacity: 1;
+        left: 0;
+        -webkit-transform: rotate(0deg);
+        -moz-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+        -webkit-transition: .25s ease-in-out;
+        -moz-transition: .25s ease-in-out;
+        -o-transition: .25s ease-in-out;
+        transition: .25s ease-in-out;
+    }
+
+    .animated-ham-icon span {
+        background: var(--nav-light);
+    }
+
+    .animated-ham-icon span:nth-child(1) {
+        top: 0px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon span:nth-child(2) {
+        top: 10px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon span:nth-child(3) {
+        top: 20px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon.open span:nth-child(1) {
+        -webkit-transform: rotate(45deg);
+        -moz-transform: rotate(45deg);
+        -o-transform: rotate(45deg);
+        transform: rotate(45deg);
+        top: 0px;
+        left: 8px;
+    }
+
+    .animated-ham-icon.open span:nth-child(2) {
+        width: 0%;
+        opacity: 0;
+    }
+
+    .animated-ham-icon.open span:nth-child(3) {
+        -webkit-transform: rotate(-45deg);
+        -moz-transform: rotate(-45deg);
+        -o-transform: rotate(-45deg);
+        transform: rotate(-45deg);
+        top: 21px;
+        left: 8px;
+    }
+
+    /* end of hamburger animation */
+
+</style>
+
+</head>
+
+<body>
+
+<svg aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden;" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<defs>
+<symbol id="icon-easywp" viewBox="0 0 20 20">
+<title>easywp</title>
+<path id="easywp-icon-path" style="fill: var(--nav-dark);" d="M19.736 12.277c0-0.748-0.287-1.099-0.749-1.099-0.143 0-0.271 0.032-0.367 0.096-0.701 1.162-1.323 1.672-2.374 1.672-0.908 0-1.53-0.366-1.88-1.067 1.084-2.022 1.832-3.678 1.832-5.955 0-3.933-2.231-5.924-6.199-5.924s-6.199 1.99-6.199 5.924c0 2.277 0.749 3.933 1.832 5.955-0.351 0.701-0.972 1.067-1.88 1.067-1.052 0-1.673-0.51-2.374-1.672-0.096-0.064-0.223-0.096-0.367-0.096-0.462 0-0.749 0.35-0.749 1.099 0 1.815 1.609 3.312 3.936 3.312 0.606 0 1.243-0.096 1.944-0.35-0.924 2.293-1.944 2.771-3.314 2.436-0.351 0.175-0.462 0.541-0.462 0.828 0 0.764 0.797 1.497 2.438 1.497 2.358 0 4.207-1.481 4.924-4.634 0.080-0.080 0.143-0.143 0.271-0.143s0.191 0.064 0.271 0.143c0.717 3.153 2.565 4.634 4.924 4.634 1.641 0 2.438-0.732 2.438-1.497 0-0.287-0.112-0.653-0.462-0.828-1.37 0.334-2.39-0.143-3.314-2.436 0.701 0.255 1.339 0.35 1.944 0.35 2.326 0 3.936-1.497 3.936-3.312z"></path>
+</symbol>
+</defs>
+</svg>
+
+<div class="container-fluid">
+
+<!--
+    <div class="row justify-content-end stylish-color shadow">
+        <div class="col-6">
+            <ul class="nav nav-tabs nav-justified" id="nav-tab" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files<span class="hide-backups">&amp;Backups</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a>
+                </li>
+            </ul>
+        </div>
+        <div class="col my-auto">
+            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+            <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+        </div>
+    </div>
+-->
+
+    <!--Navbar-->
+    <nav class="navbar navbar-dark stylish-color">
+
+        <!-- Navbar brand -->
+        <a class="navbar-brand" href="#"><span class="navbar-brand-span">Menu</span></a>
+
+        <!-- Collapse button -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#menuContent" aria-controls="menuContent" aria-expanded="false" aria-label="Toggle navigation">
+            <div class="animated-ham-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </button>
+
+        <!-- Collapsible content -->
+        <div class="collapse navbar-collapse" id="menuContent">
+
+            <!-- Links -->
+            <ul class="navbar-nav mr-auto nav-tabs" id="nav-tab" role="tablist">
+                <li class="nav-item">
+                    <!-- span with data-toggle is wrapper because bootstrap doesn't support mupltiple data-toggle on one element. The data-toogles on each menu item is "collapse" and "tab". -->
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files&amp;Backups</a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a></span>
+                </li>
+            </ul>
+            <!-- Links -->
+
+        </div>
+        <!-- Collapsible content -->
+
+    </nav>
+    <!--/.Navbar-->
+
+    <div class="row h-100">
+        <div class="tab-content col-xl-smaller-6 mt-5" id="tab-content">
+            <div class="tab-pane fade show active" id="easywp" role="tabpanel" aria-labelledby="easywp-tab">
+                <div class="row easywp-row">
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFlush">Flush Cache</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFixFilesystem">Fix Filesystem</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFixPlugin">Fix EasyWP Plugin</button>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="debug" role="tabpanel" aria-labelledby="debug-tab">
+                <div class="row">
+                    <div class="col" style="margin-left: 6px;">
+                        <div class="btn-group" role="group" aria-label="Debug Group">
+                            <button type="button" class="btn stylish-success" id="btnDebugOn">Enable Debug</button>
+                            <button type="button" class="btn stylish-warning" id="btnDebugOff">Disable Debug</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-5">
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnReplace">Replace Default Files</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnActivate">Activate Clean 2019 Theme</button>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="files-backups" role="tabpanel" aria-labelledby="files-tab">
+                <div class="row">
+                    <div class="col-xl-smaller-12 col-md-11">
+                        <form id="extract-form">
+                            <div class="form-group input-group mb-0">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip" required>
+
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">To</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="dest-dir" name="dest-dir" placeholder="destination/folder">
+                                <span class="input-group-btn">
+                                    <button type="submit" class="btn btn-form stylish-color" id="btnExtract">Submit</button>
+                                </span>
+                            </div>
+                            <small id="dest-dir-help" class="form-text text-muted" style="margin-left: 51.5%">Destination directory is the website root directory by default.</small>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row mt-4" id="archive-form-row">
+                    <div class="col-xl-smaller-12 col-md-10">
+                        <form id="archive-form">
+                            <div class="form-group input-group">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">Compress</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="folder-archive" name="folder-archive" placeholder="root-directory">
+
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">To</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="archive-name" name="archive-name" placeholder="">
+                                <span class="input-group-btn">
+                                    <button type="submit" class="btn btn-form stylish-color" id="btnArchive">Submit</button>
+                                </span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="row mt-4 mb-0 p-col">
+                    <form id="view-form">
+                        <!-- margins have to be duplicated because otherwise they are overriden by default form-group ones -->
+                        <div class="form-group input-group mt-4 mb-0">
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">View content of a ZIP archive</div>
+                            </div>
+                            <input type="text" class="form-control mr-3" id="zip-file-view" name="zip-file-view" placeholder="file.zip" required>
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-form stylish-color" id="btnView">Submit</button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="row mt-5 p-col">
+                    <form id="delete-form">
+                        <div class="form-group input-group">
+                            <div class="input-group-prepend">
+                                <div class="input-group-text input-group-text-info">Delete folder/file</div>
+                            </div>
+                            <input type="text" class="form-control mr-3" id="delete-entry" name="delete-file" placeholder="path/to/folder" required>
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-form stylish-color" id="btnDelete">Submit</button>
+                            </span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="database" role="tabpanel" aria-labelledby="database-tab">
+                <div class="row">
+                    <div class="col-xs-smaller-12">
+                        <div class="btn-group" role="group" aria-label="Adminer Group">
+                            <button type="button" class="btn stylish-success" id="btnAdminerOn">Enable Adminer</button>
+                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
+                            <button type="button" class="btn stylish-warning" id="btnAdminerOff">Disable Adminer</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class=" col-xl-smaller-6 mt-5 panel panel-primary" id="result-panel">
+            <div class="panel-heading">
+                <h3 class="panel-title">Progress Log</h3>
+            </div>
+            <div class="panel-body">
+                <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
+
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MDB core JavaScript -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.8.8/js/mdb.min.js"></script>
+
+
+</body>
+
+</html>
