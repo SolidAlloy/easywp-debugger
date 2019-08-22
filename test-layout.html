@@ -27,6 +27,39 @@ var colors = {
     navDark: '#abc7dd',
 };
 
+var printMsg = function(msg, scroll, color, small) {
+    // default parameters
+    color = color || '';
+    small = small || false;
+
+    if (small) {
+        liString = '<li class="list-group-item '+color+'" style="height: 30px; padding-top: 0px; padding-bottom: 0px;"><small>'+msg+'</small></li>';
+    } else {
+        liString = '<li class="list-group-item '+color+'" style="height: 40px; padding-top: 7px; white-space: nowrap;">'+msg+'</li>';
+    }
+
+    $('#progress-log').append(liString);
+    
+    if (!small) {
+        // make the text block higher if the text is wrapped to multiple lines
+        lastLi = $('#progress-log > li').last();
+        // sometimes innerWidth is 0.5 pixel more than scrollWidth, the text shouldn't be overflown in this case, so +1 is added
+        if (lastLi[0].scrollWidth > lastLi.innerWidth()+1) {
+            var additionalRows = Math.floor( lastLi[0].scrollWidth / lastLi.innerWidth() );
+            lastLi.css({
+                "white-space": "normal",
+                "word-wrap": "break-word",
+                "height": (40+27*additionalRows).toString()+"px",
+            });
+        }
+    }
+
+    if (scroll) {
+        var progressLog = document.getElementById("progress-log");
+        progressLog.scrollTop = progressLog.scrollHeight;
+    }
+};
+
 /**
  * [prependZero puts 0 before the number if it is less than 10. Doesn't work on numbers above 99]
  * @param  {integer} num [number where 0 should be put]
@@ -63,6 +96,15 @@ var setMaxheight = function(){
     progressLog.css({'max-height' : winHeight + "px"});
 };
 
+/**
+ * Makes the correct menu item active when navbar gets switched to another view
+ * @return {[type]} [description]
+ */
+var transferActiveTab = function() {
+    $activeTab = $('.tab-pane.active'); // find active tab
+    $('.'+$activeTab.attr('aria-labelledby')).addClass('active');  // make menu item responsible for this tab active
+};
+
 
 $(document).ready(function() {
 
@@ -72,11 +114,9 @@ $(document).ready(function() {
 
     //  "on focusout" doesn't work properly in all cases, so this is a woraround
     $('.nav-link').not('#easywp-tab').on("click", function() {
-        $('#easywp-icon-path').css({ fill: colors.navLight });
-        $(this).attr({
-            'aria-selected': 'false',
-        });
-        $(this).parent().removeClass('active');
+        if ($(window).width() > 1018) {
+            $('#easywp-icon-path').css({ fill: colors.navLight });
+        }
     });
 
     // default "active" removal got broken for hamburger meu for some reason
@@ -97,6 +137,7 @@ $(document).ready(function() {
 
     $(window).resize(function(){
         setMaxheight();
+        transferActiveTab();
     });
 
     $('#archive-name').val(getArchiveName());  // show default name of a backup in the field
@@ -115,8 +156,6 @@ $(document).ready(function() {
         $('.animated-ham-icon').toggleClass('open');
     });
 
-
-
 });
 
 </script>
@@ -129,13 +168,50 @@ $(document).ready(function() {
         --nav-dark: #abc7dd;
         --stylish-light: #cbdce9;
         --unique-light: #eaf1f6;
-        --stylish-red: #D36582;
-        --red-light: #fbf2f4;
+        --stylish-red-light: #fbf2f4;
         --stylish-warning: #ecd779;
         --stylish-success: #b7e783;
         --stylish-color-active: #5E626E;
+        --red-progress: #e48282;
+        --success-progress: #d3f0b4;
+        --warning-progress: #f2e5a7;
+        --info-progress: #8cb2d0;
+
     }
 
+
+    /* Progress Log Adjustments */
+
+    .progress-log{
+        margin-bottom: 10px;
+        overflow-x: hidden;
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .scrollbar-secondary::-webkit-scrollbar {
+        background-color: #F5F5F5;
+        border-bottom-right-radius: 3px;
+        border-top-right-radius: 3px;
+        max-height: 550px;
+        width: 12px;
+
+    }
+
+    .scrollbar-secondary::-webkit-scrollbar-thumb {
+        background-color: #6C757D;
+        border-radius: 3px;
+        -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* End of Progress Log Adjustments */
+
+
+    .version-notification {
+        bottom: 70px;
+        position: fixed;
+        right: 50px;
+    }
 
     .tab-content {
         margin-left: auto;
@@ -156,7 +232,13 @@ $(document).ready(function() {
         border-bottom: 0;
     }
 
-    @media screen and (min-width: 1340px) {  /* for desktop navbar */
+    @media screen and (min-width: 1019px) {  /* for desktop navbar */
+
+        /* show desktop navbar only on large screens */
+        .navbar-hamburger {
+            display: none !important;
+        }
+
         .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
             color: var(--nav-dark);
             background-color: transparent;
@@ -178,9 +260,19 @@ $(document).ready(function() {
             border-color: transparent;
         }
 
+        .icon-easywp {
+            fill: var(--nav-dark);
+        }
+
     }
 
-    @media screen and (max-width: 1340px) {  /* for hamburger navbar */
+    @media screen and (max-width: 1018px) {  /* for hamburger navbar */
+
+        /* show hamburger only on small screens */
+        .navbar-desktop {
+            display: none !important;
+        }
+
         /* override default MDBootstrap behavior: remove radius and white border at the bottom */
         .nav-tabs .nav-link {
             border: none;
@@ -189,10 +281,15 @@ $(document).ready(function() {
         }
         
         /* default color of all menu items */
-        .navbar-brand-span, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
+        .navbar-dark .navbar-brand, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
             color: var(--nav-light);
         }
-        
+
+        /* default behavior for navbar-brand is to change to the white color. This snippet removes hover animation at all */
+        .navbar-dark .navbar-brand:hover {
+            color: var(--nav-light);
+        }
+
         /* switch to darker color on hover for the active menu item */
         .navbar.navbar-dark .navbar-nav .nav-item.active>span>.nav-link:hover {
             color: var(--nav-dark);
@@ -202,9 +299,14 @@ $(document).ready(function() {
         .navbar.navbar-dark .navbar-nav .nav-item>span>.nav-link:hover {
             color: var(--nav-dark);
         }
+
+        /* switch the easywp icon to darker color on hover for the easywp menu item */
+        #easywp-tab:hover .icon-easywp {
+            fill: var(--nav-dark);
+        }
         
-        /* override animation (default color is white for MDBootstrap) */
-        .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
+        /* override animation (default color is white for MDBootstrap). The second selector is the easywp icon that doesn't get animated along with the text */
+        .navbar.navbar-dark .navbar-nav .nav-item .nav-link, #easywp-tab .icon-easywp {
             transition-property: all;
             transition-duration: 0.35s;
             transition-timing-function: ease;
@@ -214,6 +316,10 @@ $(document).ready(function() {
         /* make background color lighter for the active item */
         .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
             background-color: var(--stylish-color-active);
+        }
+
+        .icon-easywp {
+            fill: var(--nav-light);
         }
 
     }
@@ -229,7 +335,7 @@ $(document).ready(function() {
         height: 1em;
         stroke-width: 0;
         stroke: currentColor;
-        fill: currentColor;
+        /* fill: currentColor; */
         margin-bottom: 3px;  /* this margin lines up the icon with awesomefont icons */
         margin-left: 3px;
     }
@@ -237,6 +343,9 @@ $(document).ready(function() {
     .btn-nav {
         padding: .42rem 1.07rem;
     }
+
+
+    /* Custom Colors */
 
     .btn.stylish-color {
         color: var(--stylish-light);
@@ -247,8 +356,7 @@ $(document).ready(function() {
     }
 
     .btn-red {
-        background-color: var(--stylish-red);
-        color: var(--red-light);
+        color: var(--stylish-red-light);
     }
 
     .btn.stylish-warning {
@@ -264,6 +372,28 @@ $(document).ready(function() {
     .input-group-text-info {
         background-color: var(--stylish-light);
         border: 1px solid var(--nav-dark);
+    }
+
+    .success-progress {
+        background-color: var(--success-progress);
+    }
+
+    .warning-progress {
+        background-color: var(--warning-progress);
+    }
+
+    .red-progress {
+        background-color: var(--red-progress);
+    }
+
+    .info-progress {
+        background-color: var(--info-progress)
+    }
+
+    /* End of Custom Colors */
+
+    .btn-group {
+        margin: .375rem;
     }
 
     .btn.btn-form {
@@ -317,6 +447,20 @@ $(document).ready(function() {
         .col-xl-smaller-12 {
             flex: 0 0 100%;
             max-width: 100%;
+        }
+
+        .tab-content {
+            margin-top: 84px;
+        }
+
+        .tab-content #files-backups {
+            margin-top: -26px;
+        }
+    }
+
+    @media screen and (max-width: 1131px) {
+        .tab-content {
+            margin-top: 3em;
         }
     }
 
@@ -436,28 +580,27 @@ $(document).ready(function() {
 <defs>
 <symbol id="icon-easywp" viewBox="0 0 20 20">
 <title>easywp</title>
-<path id="easywp-icon-path" style="fill: var(--nav-dark);" d="M19.736 12.277c0-0.748-0.287-1.099-0.749-1.099-0.143 0-0.271 0.032-0.367 0.096-0.701 1.162-1.323 1.672-2.374 1.672-0.908 0-1.53-0.366-1.88-1.067 1.084-2.022 1.832-3.678 1.832-5.955 0-3.933-2.231-5.924-6.199-5.924s-6.199 1.99-6.199 5.924c0 2.277 0.749 3.933 1.832 5.955-0.351 0.701-0.972 1.067-1.88 1.067-1.052 0-1.673-0.51-2.374-1.672-0.096-0.064-0.223-0.096-0.367-0.096-0.462 0-0.749 0.35-0.749 1.099 0 1.815 1.609 3.312 3.936 3.312 0.606 0 1.243-0.096 1.944-0.35-0.924 2.293-1.944 2.771-3.314 2.436-0.351 0.175-0.462 0.541-0.462 0.828 0 0.764 0.797 1.497 2.438 1.497 2.358 0 4.207-1.481 4.924-4.634 0.080-0.080 0.143-0.143 0.271-0.143s0.191 0.064 0.271 0.143c0.717 3.153 2.565 4.634 4.924 4.634 1.641 0 2.438-0.732 2.438-1.497 0-0.287-0.112-0.653-0.462-0.828-1.37 0.334-2.39-0.143-3.314-2.436 0.701 0.255 1.339 0.35 1.944 0.35 2.326 0 3.936-1.497 3.936-3.312z"></path>
+<path id="easywp-icon-path" d="M19.736 12.277c0-0.748-0.287-1.099-0.749-1.099-0.143 0-0.271 0.032-0.367 0.096-0.701 1.162-1.323 1.672-2.374 1.672-0.908 0-1.53-0.366-1.88-1.067 1.084-2.022 1.832-3.678 1.832-5.955 0-3.933-2.231-5.924-6.199-5.924s-6.199 1.99-6.199 5.924c0 2.277 0.749 3.933 1.832 5.955-0.351 0.701-0.972 1.067-1.88 1.067-1.052 0-1.673-0.51-2.374-1.672-0.096-0.064-0.223-0.096-0.367-0.096-0.462 0-0.749 0.35-0.749 1.099 0 1.815 1.609 3.312 3.936 3.312 0.606 0 1.243-0.096 1.944-0.35-0.924 2.293-1.944 2.771-3.314 2.436-0.351 0.175-0.462 0.541-0.462 0.828 0 0.764 0.797 1.497 2.438 1.497 2.358 0 4.207-1.481 4.924-4.634 0.080-0.080 0.143-0.143 0.271-0.143s0.191 0.064 0.271 0.143c0.717 3.153 2.565 4.634 4.924 4.634 1.641 0 2.438-0.732 2.438-1.497 0-0.287-0.112-0.653-0.462-0.828-1.37 0.334-2.39-0.143-3.314-2.436 0.701 0.255 1.339 0.35 1.944 0.35 2.326 0 3.936-1.497 3.936-3.312z"></path>
 </symbol>
 </defs>
 </svg>
 
 <div class="container-fluid">
 
-<!--
-    <div class="row justify-content-end stylish-color shadow">
+    <div class="row justify-content-end stylish-color shadow navbar-desktop">
         <div class="col-6">
             <ul class="nav nav-tabs nav-justified" id="nav-tab" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
+                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
+                    <a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files<span class="hide-backups">&amp;Backups</span></a>
+                    <a class="nav-link files-tab" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files<span class="hide-backups">&amp;Backups</span></a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a>
+                    <a class="nav-link database-tab" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a>
                 </li>
             </ul>
         </div>
@@ -466,13 +609,12 @@ $(document).ready(function() {
             <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
         </div>
     </div>
--->
 
     <!--Navbar-->
-    <nav class="navbar navbar-dark stylish-color">
+    <nav class="navbar navbar-dark stylish-color navbar-hamburger">
 
         <!-- Navbar brand -->
-        <a class="navbar-brand" href="#"><span class="navbar-brand-span">Menu</span></a>
+        <span class="navbar-brand" style="font-weight: bold;">EasyWP Debugger</span>
 
         <!-- Collapse button -->
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#menuContent" aria-controls="menuContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -490,16 +632,24 @@ $(document).ready(function() {
             <ul class="navbar-nav mr-auto nav-tabs" id="nav-tab" role="tablist">
                 <li class="nav-item">
                     <!-- span with data-toggle is wrapper because bootstrap doesn't support mupltiple data-toggle on one element. The data-toogles on each menu item is "collapse" and "tab". -->
-                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a></span>
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a></span>
                 </li>
                 <li class="nav-item">
-                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a></span>
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a></span>
                 </li>
                 <li class="nav-item">
-                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files&amp;Backups</a></span>
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link files-tab" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files&amp;Backups</a></span>
                 </li>
                 <li class="nav-item">
-                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a></span>
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link database-tab" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a></span>
+                </li>
+                <li>
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn btn-nav unique-color float-left mr-5" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+                            <button type="button" class="btn btn-nav btn-red float-left" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+                        </div>
+                    </div>
                 </li>
             </ul>
             <!-- Links -->
@@ -511,9 +661,9 @@ $(document).ready(function() {
     <!--/.Navbar-->
 
     <div class="row h-100">
-        <div class="tab-content col-xl-smaller-6 mt-5" id="tab-content">
+        <div class="tab-content col-xl-smaller-6" id="tab-content">
             <div class="tab-pane fade show active" id="easywp" role="tabpanel" aria-labelledby="easywp-tab">
-                <div class="row easywp-row">
+                <div class="row easywp-row text-center">
                     <div class="col">
                         <button type="button" class="btn unique-color" id="btnFlush">Flush Cache</button>
                     </div>
@@ -526,7 +676,7 @@ $(document).ready(function() {
                 </div>
             </div>
             <div class="tab-pane fade" id="debug" role="tabpanel" aria-labelledby="debug-tab">
-                <div class="row">
+                <div class="row text-center">
                     <div class="col" style="margin-left: 6px;">
                         <div class="btn-group" role="group" aria-label="Debug Group">
                             <button type="button" class="btn stylish-success" id="btnDebugOn">Enable Debug</button>
@@ -534,7 +684,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
-                <div class="row mt-5">
+                <div class="row mt-5 text-center">
                     <div class="col">
                         <button type="button" class="btn unique-color" id="btnReplace">Replace Default Files</button>
                     </div>
@@ -617,7 +767,7 @@ $(document).ready(function() {
                 </div>
             </div>
             <div class="tab-pane fade" id="database" role="tabpanel" aria-labelledby="database-tab">
-                <div class="row">
+                <div class="row justify-content-center">
                     <div class="col-xs-smaller-12">
                         <div class="btn-group" role="group" aria-label="Adminer Group">
                             <button type="button" class="btn stylish-success" id="btnAdminerOn">Enable Adminer</button>
@@ -628,14 +778,22 @@ $(document).ready(function() {
                 </div>
             </div>
         </div>
-        <div class=" col-xl-smaller-6 mt-5 panel panel-primary" id="result-panel">
-            <div class="panel-heading">
-                <h3 class="panel-title">Progress Log</h3>
+        <div class="col-xl-smaller-6 mt-5">
+            <div class="row mb-3 d-none">
+                <div class="col-12">
+                    <div class="progress" style="height: 23px;" id="progress-container"></div>
+                </div>
             </div>
-            <div class="panel-body">
-                <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
-
-                </ul>
+            <div class="row">
+                <div class="col-12 panel panel-primary" id="result-panel">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Progress Log</h3>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
