@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '1.3.1');
+define('VERSION', '2.0 beta');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -890,7 +890,8 @@ function clearAll()
     if (!file_exists('/var/www/wptbox')) {
         return array('redis_success' => false,
                      'varnish_success' => false,
-                     'errors' => array("It is not EasyWP, is it?"
+                     'easywp' => false,
+                     'errors' => array("It is not EasyWP, is it?",
                     ));
     }
 
@@ -905,6 +906,7 @@ function clearAll()
 
     return array('redis_success' => $redis_success,
                  'varnish_success' => $varnish_success,
+                 'easywp' => true,
                  'errors' => $varnish_cache->errors);
 }
 
@@ -978,7 +980,10 @@ function rrmdir($dir, $failedRemovals=[])
         foreach ($objects as $object) {
             if ($object != "." && $object != "..") {
                 if (is_dir($dir.DS.$object)) {
-                    array_push($failedRemovals, rrmdir($dir.DS.$object, $failedRemovals)); // add new failed removals to the existing ones
+                    $failedRemovalsChild = rrmdir($dir.DS.$object, $failedRemovals);
+                    if ($failedRemovalsChild) {
+                        array_push($failedRemovals, $failedRemovalsChild); // add new failed removals to the existing ones
+                    }
                 } else {
                     if (!unlink($dir.DS.$object)) {
                         array_push($failedRemovals, $dir.DS.$object);
@@ -1810,7 +1815,11 @@ if (authorized()) {
 <!-- *    !!! JQuery functions section !!!  -->
 <!-- *                                      -->
 
+<!-- JQuery -->
 <script src="https://code.jquery.com/jquery-3.4.0.min.js" integrity="sha256-BJeo0qm959uMBGb65z40ejJYGSgR7REI4+CW1fNKwOg=" crossorigin="anonymous"></script>
+<!-- Bootstrap tooltips -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.4/umd/popper.min.js"></script>
+<!-- Bootstrap core JavaScript -->
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 
 <?php if (authorized()): ?>
@@ -1841,7 +1850,8 @@ var printMsg = function(msg, scroll, color, small) {
     if (!small) {
         // make the text block higher if the text is wrapped to multiple lines
         lastLi = $('#progress-log > li').last();
-        if (lastLi[0].scrollWidth > lastLi.innerWidth()) {
+        // sometimes innerWidth is 0.5 pixel more than scrollWidth, the text shouldn't be overflown in this case, so +1 is added
+        if (lastLi[0].scrollWidth > lastLi.innerWidth()+1) {
             var additionalRows = Math.floor( lastLi[0].scrollWidth / lastLi.innerWidth() );
             lastLi.css({
                 "white-space": "normal",
@@ -1878,6 +1888,10 @@ var printMsg = function(msg) {
 <script>  // the section being loaded regardless of authorized()
 
 // global variables
+var colors = {
+    navLight: '#cbdce9',
+    navDark: '#abc7dd',
+};
 var defaultDoneText = '<i class="fas fa-check fa-fw"></i> Submit';
 var defaultFailText = '<i class="fas fa-times fa-fw"></i> Submit';
 
@@ -1908,7 +1922,7 @@ var handleEmptyResponse = function($button, jsonData, failText) {
             $button.html(failText);
             $button.prop("disabled", false);
         }
-        printMsg("Empty response was returned", true, 'bg-danger-light');
+        printMsg("Empty response was returned", true, 'danger-progress');
     }
 };
 
@@ -1958,7 +1972,7 @@ var handleErrors = function (jqXHR, exception, excludeList) {
         msg = 'Uncaught Error.\n' + jqXHR.responseText;
     }
 
-    printMsg(msg, true, 'bg-danger-light');
+    printMsg(msg, true, 'danger-progress');
 };
 
 /**
@@ -1993,22 +2007,18 @@ var getArchiveName = function() {
 var setMaxheight = function(){
     var progressLog = $("#progress-log");
     var winHeight = $(window).height();
-    winHeight -= 400;
+    winHeight -= 210;
     progressLog.css({'max-height' : winHeight + "px"});
 };
 
+
 /**
- * [showVerticalLine shows vertical line between forms and buttons if the distance between them is too short]
+ * Makes the correct menu item active when navbar gets switched to another view
  * @return {null}
  */
-var showVerticalLine = function() {
-    var leftHalf = $("#left-half");
-    var winWidth = $(window).width();
-    if (winWidth < 1600) {
-        leftHalf.css({"border-right" : "2px solid #dee2e6"});
-    } else {
-        leftHalf.css({"border-right" : ""});
-    }
+var transferActiveTab = function() {
+    $activeTab = $('.tab-pane.active'); // find active tab
+    $('.'+$activeTab.attr('aria-labelledby')).addClass('active');  // make menu item responsible for this tab active
 };
 
 </script>
@@ -2017,9 +2027,11 @@ var showVerticalLine = function() {
 
 /**
  * [sendFlushRequest sends POST request to flush Varnish and Redis caches]
+ * @param  {bool} verbose Determines whether to tell that the hosting is not EasyWP.
  * @return {null}
  */
-var sendFlushRequest = function() {
+var sendFlushRequest = function(verbose) {
+    verbose = verbose || false;
     $.ajax({
         type: "POST",
         timeout: 20000,
@@ -2029,24 +2041,26 @@ var sendFlushRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($('#btnFlush'), jsonData);
-            if (jsonData.redis_success) {
-                printMsg('Redis Flushed Successfully!', false, 'bg-success-light');
-            } else {
-                printMsg('Redis Flush Failed!', false, 'bg-warning-light');
-            }
-            if (jsonData.varnish_success) {
-                printMsg('Varnish Flushed Successfully!', true, 'bg-success-light');
-            } else {
-                printMsg('Varnish Flush Failed!', true, 'bg-warning-light');
-            }
-            if (jsonData.errors.length !== 0) {
-                jsonData.errors.forEach(function(item, index, array) {
-                    printMsg(item, true, 'bg-danger-light');
-                });
+            if (verbose || jsonData.easywp) {
+                if (jsonData.redis_success) {
+                    printMsg('Redis Flushed Successfully!', false, 'success-progress');
+                } else {
+                    printMsg('Redis Flush Failed!', false, 'warning-progress');
+                }
+                if (jsonData.varnish_success) {
+                    printMsg('Varnish Flushed Successfully!', true, 'success-progress');
+                } else {
+                    printMsg('Varnish Flush Failed!', true, 'warning-progress');
+                }
+                if (jsonData.errors.length !== 0) {
+                    jsonData.errors.forEach(function(item, index, array) {
+                        printMsg(item, true, 'danger-progress');
+                    });
+                }
             }
         },
         error: function (jqXHR, exception) {  // on error
@@ -2069,14 +2083,14 @@ var sendDebugOnRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnDebugOn"), jsonData);
             if (jsonData.debug_on_success) {
-                printMsg('Debug Enabled Successfully!', true, 'bg-success-light');
+                printMsg('Debug Enabled Successfully!', true, 'success-progress');
             } else {
-                printMsg('Enabling Debug Failed!', true, 'bg-warning-light');
+                printMsg('Enabling Debug Failed!', true, 'warning-progress');
             }
             sendFlushRequest();
         },
@@ -2100,14 +2114,14 @@ var sendDebugOffRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnDebugOff"), jsonData);
             if (jsonData.debug_off_success) {
-                printMsg('Debug Disabled Successfully!', true, 'bg-success-light');
+                printMsg('Debug Disabled Successfully!', true, 'success-progress');
             } else {
-                printMsg('Disabling Debug Failed!', true, 'bg-warning-light');
+                printMsg('Disabling Debug Failed!', true, 'warning-progress');
             }
             sendFlushRequest();
         },
@@ -2139,16 +2153,16 @@ var sendReplaceRequest = function($button) {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 $button.html(failText);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
             if (jsonData.replace_success) {
                 $button.html(doneText);
-                printMsg('Files Replaced Successfully!', true, 'bg-success-light');
+                printMsg('Files Replaced Successfully!', true, 'success-progress');
             } else {
                 $button.html(failText);
-                printMsg('Files Replacing Failed!', true, 'bg-warning-light');
+                printMsg('Files Replacing Failed!', true, 'warning-progress');
             }
             sendFlushRequest();
         },
@@ -2182,7 +2196,7 @@ var sendActivateRequest = function($button) {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 $button.html(failText);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
@@ -2192,18 +2206,18 @@ var sendActivateRequest = function($button) {
                 $button.html(failText);
             }
             if (jsonData.replace == "1") {
-                printMsg('Theme Uploaded Successfully!', false, 'bg-success-light');
+                printMsg('Theme Uploaded Successfully!', false, 'success-progress');
             } else {
-                printMsg('Theme Upload Failed!', false, 'bg-warning-light');
+                printMsg('Theme Upload Failed!', false, 'warning-progress');
             }
             if (jsonData.activate == "1") {
-                printMsg('Theme Activated Successfully!', true, 'bg-success-light');
+                printMsg('Theme Activated Successfully!', true, 'success-progress');
             } else {
-                printMsg('Theme Activation Failed!', true, 'bg-warning-light');
+                printMsg('Theme Activation Failed!', true, 'warning-progress');
             }
             if (jsonData.errors.length !== 0) {
                 jsonData.errors.forEach(function(item, index, array) {
-                    printMsg(item, true, 'bg-danger-light');
+                    printMsg(item, true, 'danger-progress');
                 });
             }
             sendFlushRequest();
@@ -2230,16 +2244,16 @@ var sendAdminerOnRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnAdminerOff"), jsonData);
             if (jsonData.success) {
-                printMsg('Adminer Enabled Successfully!', true, 'bg-success-light');
+                printMsg('Adminer Enabled Successfully!', true, 'success-progress');
                 // open Adminer in a new tab in 1 second after the success message is shown
                 setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
             } else {
-                printMsg('Adminer Failed!', true, 'bg-warning-light');
+                printMsg('Adminer Failed!', true, 'warning-progress');
             }
         },
         error: function (jqXHR, exception) {
@@ -2262,14 +2276,14 @@ var sendAdminerOffRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("btnAdminerOff"), jsonData);
             if (jsonData.success) {
-                printMsg('Adminer Disabled Successfully!', true, 'bg-success-light');
+                printMsg('Adminer Disabled Successfully!', true, 'success-progress');
             } else {
-                printMsg('Adminer Disabling Failed!', true, 'bg-warning-light');
+                printMsg('Adminer Disabling Failed!', true, 'warning-progress');
             }
         },
         error: function (jqXHR, exception) {
@@ -2300,14 +2314,14 @@ var sendFixFilesystemRequest = function($button) {
             } catch (e) {
                 $button.html(failText);
                 $button.prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
             if (jsonData.success) {
                 $button.html(doneText);
                 $button.prop("disabled", false);
-                printMsg('FileSystem Has Been Fixed!', true, 'bg-success-light');
+                printMsg('FileSystem Has Been Fixed!', true, 'success-progress');
             }
             sendFlushRequest();
         },
@@ -2333,19 +2347,19 @@ var sendFixPluginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($('#btnFixPlugin'), jsonData);
             if (jsonData.symLink) {
-                printMsg('Symlink Created Successfully!', false, 'bg-success-light');
+                printMsg('Symlink Created Successfully!', false, 'success-progress');
             } else {
-                printMsg('Symlink Creation Failed!', false, 'bg-warning-light');
+                printMsg('Symlink Creation Failed!', false, 'warning-progress');
             }
             if (jsonData.objectCache) {
-                printMsg('object-cache.php Created Successfully!', true, 'bg-success-light');
+                printMsg('object-cache.php Created Successfully!', true, 'success-progress');
             } else {
-                printMsg('object-cache.php Creation Failed!', true, 'bg-warning-light');
+                printMsg('object-cache.php Creation Failed!', true, 'warning-progress');
             }
             sendFlushRequest();
         },
@@ -2369,12 +2383,12 @@ var sendDeleteAutoLoginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (!jsonData.success) {
-                printMsg('Failed to remove wp-admin-auto.php. Please do it manually', true, 'bg-warning-light');
+                printMsg('Failed to remove wp-admin-auto.php. Please do it manually', true, 'warning-progress');
             }
         },
         error: function (jqXHR, exception) {
@@ -2397,25 +2411,25 @@ var sendAutoLoginRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (jsonData.success) {
-                printMsg('Success! You will be redirected in a second', true, 'bg-success-light');
+                printMsg('Success! You will be redirected in a second', true, 'success-progress');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
                 setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (jsonData.file === false) {  // it can also be true and null
-                    printMsg('Failed to upload wp-admin-auto.php.', true, 'bg-warning-light'); 
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'warning-progress'); 
                 }   
                 if (!jsonData.siteurl) {    
-                    printMsg('Failed to find siteurl', true, 'bg-warning-light');   
+                    printMsg('Failed to find siteurl', true, 'warning-progress');   
                 }   
                 if (jsonData.errors.length !== 0) { 
                     jsonData.errors.forEach(function(item, index, array) {  
-                        printMsg(item, true, 'bg-danger-light');   
+                        printMsg(item, true, 'danger-progress');   
                     }); 
                 }
             }
@@ -2440,12 +2454,12 @@ var sendSelfDestructRequest = function() {
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             handleEmptyResponse($("#btnSelfDestruct"), jsonData);
             if (jsonData.success) {
-                printMsg('debugger.php Deleted Successfully!', true, 'bg-success-light');
+                printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
             }
         },
         error: function (jqXHR, exception) {
@@ -2518,7 +2532,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
             } catch (e) {
                 $('#btnExtract').html(defaultFailText);
                 $('#btnExtract').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
 
@@ -2528,7 +2542,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnExtract').prop("disabled", false);
                 $('#btnExtract').html(defaultDoneText);
-                printMsg('Archive extracted successfully!', true, 'bg-success-light');
+                printMsg('Archive extracted successfully!', true, 'success-progress');
                 sendFlushRequest();
             }
 
@@ -2539,10 +2553,10 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 // if the starting file was already sent before, skip it and show alert message
                 if (startNum == jsonData.startNum) {
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum+1);
-                    printMsg("The following file will not be extracted because it's too big: <strong>"+jsonData.failedFile+"</strong>", true, 'bg-warning-light');
+                    printMsg("The following file will not be extracted because it's too big: <strong>"+jsonData.failedFile+"</strong>", true, 'warning-progress');
                 } else {  // if the extraction didn't complete but another file appeared to be the last one, continue the next iteration from it (of if there were no starting files before)
                     startNum = jsonData.startNum;
-                    printMsg('The connection was interrupted on <strong>'+jsonData.failedFile+'</strong>, resuming extraction from it.', true, 'bg-info-light');
+                    printMsg('The connection was interrupted on <strong>'+jsonData.failedFile+'</strong>, resuming extraction from it.', true, 'info-progress');
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum);
                 }
             }
@@ -2551,14 +2565,14 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
                 $('#btnExtract').html(defaultFailText);
                 $('#btnExtract').prop("disabled", false);
-                printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'danger-progress');
             }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception, [0, 503]); // handle errors except for 0 and 503
             if (jqXHR.status == 503 || jqXHR.status === 0) {
                 if (maxUnzipTime == 10) {  // if the limit is already 10, nothing will help
-                    printMsg('Even requests limited by 10 seconds return 503 or network errors', true, 'bg-danger-light');
+                    printMsg('Even requests limited by 10 seconds return 503 or network errors', true, 'danger-progress');
                     $('#btnExtract').html(defaultFailText);
                     $('#btnExtract').prop("disabled", false);
                     $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
@@ -2568,7 +2582,7 @@ var sendUnzipRequest = function(archiveName, destDir, maxUnzipTime, totalNum, st
                     } else {
                         error = 'Failed To Connect. Network Error';
                     }
-                    printMsg('Previous request returned <strong>"'+error+'"</strong>. Decreasing the time limit by 10 seconds and sending the request again.', true, 'bg-warning-light');
+                    printMsg('Previous request returned <strong>"'+error+'"</strong>. Decreasing the time limit by 10 seconds and sending the request again.', true, 'warning-progress');
                     maxUnzipTime -= 10;  // if the request returned 503 because overusing a limit, try decreasing the time limit
                     sendUnzipRequest(archiveName, destDir, maxUnzipTime, totalNum, startNum);
                 }
@@ -2588,7 +2602,7 @@ var processExtractForm = function(form) {
     // preparations
     form.preventDefault();
     var zipFile = $("#zip-file-extract").val();
-    var destDir = $("#dest-dir")[0].val();
+    var destDir = $("#dest-dir").val();
     if (!destDir) {
         destDir = '.';
     }
@@ -2596,7 +2610,7 @@ var processExtractForm = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Extracting...';
     $('#btnExtract').prop("disabled", true);
     $('#btnExtract').html(loadingText);
-    printMsg('Starting Extraction. First request sent. The next update is within ' + defaultTimeLimit + ' seconds.', true, 'bg-info-light');
+    printMsg('Starting Extraction. First request sent. The next update is within ' + defaultTimeLimit + ' seconds.', true, 'info-progress');
 
     var zipIsExtractable = false;
     var dirIsWritable = false;
@@ -2605,7 +2619,8 @@ var processExtractForm = function(form) {
 
     var processExtraction = function(totalNumber) {
         if (zipIsExtractable && dirIsWritable) {
-            $("#progress-container").removeClass('d-none').addClass('show').html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
+            $("#progress-row").removeClass('d-none').addClass('show');
+            $("#progress-container").html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
             sendUnzipRequest(zipFile, destDir, defaultTimeLimit, totalNumber);
         } else {
             $('#btnExtract').html(defaultFailText);
@@ -2625,7 +2640,7 @@ var processExtractForm = function(form) {
         } catch (e) {
             $('#btnExtract').html(defaultFailText);
             $('#btnExtract').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-light');
+            printMsg('The returned value is not JSON', true, 'danger-progress');
             return;
         }
 
@@ -2635,7 +2650,7 @@ var processExtractForm = function(form) {
             zipIsExtractable = true;
             totalNumber = jsonData.number;
         } else {
-            printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
+            printMsg('An error happened upon extracting the backup: <strong>'+jsonData.error+'</strong>', true, 'danger-progress');
         }
     })
     .fail(function( jqXHR, exception, message ) {
@@ -2662,7 +2677,7 @@ var processExtractForm = function(form) {
         } catch (e) {
             $('#btnExtract').html(defaultFailText);
             $('#btnExtract').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-light');
+            printMsg('The returned value is not JSON', true, 'danger-progress');
             return;
         }
 
@@ -2671,7 +2686,7 @@ var processExtractForm = function(form) {
         if (jsonData.success) {
             dirIsWritable = true;
         } else {
-            printMsg('An error happened upon extracting the backup: <strong>Destination directory is not writable and we failed to create such directory</strong>', true, 'bg-danger-light');
+            printMsg('An error happened upon extracting the backup: <strong>Destination directory is not writable and we failed to create such directory</strong>', true, 'danger-progress');
         }
     })
     .fail(function( jqXHR, exception, message ) {
@@ -2711,7 +2726,7 @@ var processViewForm = function(form) {
             } catch (e) {
                 $('#btnView').html(defaultFailText);
                 $('#btnView').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
 
@@ -2730,7 +2745,7 @@ var processViewForm = function(form) {
             else {  // if complete fail, show returned error
                 $('#btnView').html(defaultFailText);
                 $('#btnView').prop("disabled", false);
-                printMsg('An error happened upon opening the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon opening the backup: <strong>'+jsonData.error+'</strong>', true, 'danger-progress');
             }
         },
         error: function (jqXHR, exception, message) {  // on error
@@ -2766,7 +2781,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
             } catch (e) {
                 $('#btnArchive').html(defaultFailText);
                 $('#btnArchive').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
             
@@ -2776,7 +2791,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnArchive').prop("disabled", false);
                 $('#btnArchive').html(defaultDoneText);
-                printMsg('Archive created successfully!', true, 'bg-success-light');
+                printMsg('Archive created successfully!', true, 'success-progress');
             }
 
             // if the compression didn't complete in one turn, start from the last file
@@ -2789,7 +2804,7 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-danger');
                 $('#btnArchive').html(defaultFailText);
                 $('#btnArchive').prop("disabled", false);
-                printMsg('An error happened upon creating the backup: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon creating the backup: <strong>'+jsonData.error+'</strong>', true, 'danger-progress');
             }
         },
         error: function (jqXHR, exception) {
@@ -2824,7 +2839,7 @@ var processArchiveForm = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Compressing...';
     $('#btnArchive').prop("disabled", true);
     $('#btnArchive').html(loadingText);
-    printMsg('Starting Compression...', true, 'bg-info-light');
+    printMsg('Starting Compression...', true, 'info-progress');
 
     // send request to get total number of files in directory
     var compressPreCheck = $.ajax({
@@ -2840,23 +2855,24 @@ var processArchiveForm = function(form) {
         } catch (e) {
             $('#btnArchive').html(defaultFailText);
             $('#btnArchive').prop("disabled", false);
-            printMsg('The returned value is not JSON', true, 'bg-danger-light');
+            printMsg('The returned value is not JSON', true, 'danger-progress');
             return;
         }
         
         handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
             
         if (jsonData.numberSuccess && jsonData.checkArchiveSuccess) {
-            $("#progress-container").removeClass('d-none').addClass('show').html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
+            $("#progress-row").removeClass('d-none').addClass('show');
+            $("#progress-container").html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
             sendArchiveRequest(archiveName, jsonData.number);
         } else {
             $('#btnArchive').html(defaultFailText);
             $('#btnArchive').prop("disabled", false);
             if (!jsonData.numberSuccess) {
-                printMsg('An error happened upon compressing the directory: <strong>'+jsonData.numberError+'</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon compressing the directory: <strong>'+jsonData.numberError+'</strong>', true, 'danger-progress');
             }
             if (!jsonData.checkArchiveSuccess) {
-                printMsg('An error happened upon compressing the directory: <strong>'+archiveName+' already exists</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon compressing the directory: <strong>'+archiveName+' already exists</strong>', true, 'danger-progress');
             }
         }
     })
@@ -2888,7 +2904,7 @@ var processDeleteForm = function(form) {
             } catch (e) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('The returned value is not JSON', true, 'bg-danger-light');
+                printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
 
@@ -2897,20 +2913,21 @@ var processDeleteForm = function(form) {
             if (jsonData.success) {  // if success, show the success button and message
                 $('#btnDelete').prop("disabled", false);
                 $('#btnDelete').html(defaultDoneText);
-                printMsg(entry+' deleted successfully!', true, 'bg-success-light');
+                printMsg(entry+' deleted successfully!', true, 'success-progress');
             } else if (jsonData.error) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'bg-danger-light');
+                printMsg('An error happened upon deleting the entry: <strong>'+jsonData.error+'</strong>', true, 'danger-progress');
             } else if (jsonData.failed_files) {
                 $('#btnDelete').html(defaultFailText);
                 $('#btnDelete').prop("disabled", false);
-                printMsg('The following files and folders could not be removed: ', false, 'bg-danger-light');
+                printMsg('The following files and folders could not be removed: ', false, 'danger-progress');
                 jsonData.failed_files.forEach(function(item, index, array) {
                     printMsg(item, false, null, true); // no auto-scroll, without color, small size
                 });
-                printMsg('', true, 'bg-danger-light', true); // empty message, red color, small size
+                printMsg('', true, 'danger-progress', true); // empty message, red color, small size
             }
+            sendFlushRequest();
         },
         error: function (jqXHR, exception, message) {  // on error
             handleErrors(jqXHR, exception);
@@ -2923,16 +2940,52 @@ var processDeleteForm = function(form) {
 $(document).ready(function() {
 
     setMaxheight();
-    showVerticalLine();
 
     $(window).resize(function(){
         setMaxheight();
-        showVerticalLine();
+        transferActiveTab();
     });
 
-    $('#archive-name').attr('placeholder', getArchiveName());  // show default name of a backup in the field
+    $('#easywp-tab').on("click", function() {
+        $('#easywp-icon-path').css({ fill: colors.navDark });
+    });
+
+    //  "on focusout" doesn't work properly in all cases, so this is a woraround
+    $('.nav-link').not('#easywp-tab').on("click", function() {
+        if ($(window).width() > 1018) {
+            $('#easywp-icon-path').css({ fill: colors.navLight });
+        }
+    });
+
+    // default "active" removal got broken for hamburger meu for some reason
+    $('.nav-link').on("click", function() {
+        $('.animated-ham-icon').toggleClass('open');  // the navbar will collapse because of data-toggle="collapse" but bootstrap doesn't handle animated buttons, so this it has to be animated manually
+
+        $otherLinks = $('.nav-link').not(this);
+
+        $otherLinks.attr({
+            'aria-selected': 'false',
+        });
+
+        $otherLinks.parent().removeClass('active');
+        $otherLinks.removeClass('active');
+    });
+
+    $('#archive-name').val(getArchiveName());  // show default name of a backup in the field
 
     $("#folder-archive").on("input", function(){
+        var $archiveField = $("#archive-name");
+        var folder = $(this).val();
+        if (folder) {
+            $archiveField.val(folder+'.zip');  // change the name of archive making it similar to the name of directory
+        } else {
+            $archiveField.val(getArchiveName());  // show default name of a backup in the field
+        }
+    });
+
+    $('.navbar-toggler').on('click', function () {
+        $('.animated-ham-icon').toggleClass('open');
+    });    $("#folder-archive").on("input", function(){
         $("#archive-name").attr('placeholder', $(this).val()+'.zip');  // change the name of archive making it similar to the name of directory
     });
 
@@ -2955,7 +3008,7 @@ $(document).ready(function() {
     });    
 
     $("#btnFlush").click(function() {
-        sendFlushRequest();
+        sendFlushRequest(true);  // verbose turned on
     });
 
     $("#btnDebugOn").click(function() {
@@ -3050,37 +3103,39 @@ $(document).ready(function() {
 <!-- *                                      -->
 
 
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+<!-- Font Awesome -->
 <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+<!-- Bootstrap core CSS -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+<!-- Material Design Bootstrap -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.8.8/css/mdb.min.css" rel="stylesheet">
 
-<style>
+<style type="text/css">
 
-    .container-fluid {
-        margin-left: auto;
-        margin-right: auto;
-        padding-left: 50px;
-        padding-right: 50px;
-        padding-top: 20px;
+    :root {
+        --nav-light: #cbdce9;
+        --nav-dark: #abc7dd;
+        --stylish-light: #cbdce9;
+        --unique-light: #eaf1f6;
+        --stylish-red-light: #fbf2f4;
+        --stylish-warning: #ecd779;
+        --stylish-success: #b2ec87;
+        --stylish-color-active: #5E626E;
+        --danger-progress: #e68e8e;
+        --success-progress: #cdf5b8;
+        --warning-progress: #f2e5a7;
+        --info-progress: #aec9de;
+
     }
+
+
+    /* Progress Log Adjustments */
 
     .progress-log{
         margin-bottom: 10px;
         overflow-x: hidden;
         overflow-y: scroll;
         -webkit-overflow-scrolling: touch;
-    }
-
-    .bg-info-light{
-        background-color: #bee5eb;
-    }
-    .bg-warning-light{
-        background-color: #ffeeba;
-    }
-    .bg-danger-light{
-        background-color: #f5c6cb;
-    }
-    .bg-success-light{
-        background-color: #c3e6cb;
     }
 
     .scrollbar-secondary::-webkit-scrollbar {
@@ -3091,36 +3146,379 @@ $(document).ready(function() {
         width: 12px;
 
     }
+
     .scrollbar-secondary::-webkit-scrollbar-thumb {
         background-color: #6C757D;
         border-radius: 3px;
         -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.1);
     }
 
-    .input-group-text-info {
-        background-color: #bee5eb;
-        color: #0c5460;
-    }
+    /* End of Progress Log Adjustments */
 
-    /*
-        fix round borders for forms
-     */
-
-    .input-group>.form-control:not(:last-child) {
-        border-bottom-right-radius: 3px;
-        border-top-right-radius: 3px;
-    }
-
-    .input-group>.input-group-prepend:not(:first-child)>.input-group-text {
-        border-bottom-left-radius: 3px;
-        border-top-left-radius: 3px;
-    }
 
     .version-notification {
         bottom: 70px;
         position: fixed;
         right: 50px;
     }
+
+
+    .tab-content {
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 50px;
+        padding-right: 50px;
+    }
+
+    .nav-link {
+        padding: .5rem 0px;
+    }
+
+    .navbar-dark .navbar-nav .nav-link {
+        color: var(--nav-dark);
+    }
+
+    .nav-tabs {  /* override default MDBootstrap behavior */
+        border-bottom: 0;
+    }
+
+    @media screen and (min-width: 1019px) {  /* for desktop navbar */
+
+        /* show desktop navbar only on large screens */
+        .navbar-hamburger {
+            display: none !important;
+        }
+
+        .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+            color: var(--nav-dark);
+            background-color: transparent;
+            border-color: transparent transparent var(--nav-dark);
+            border-bottom: 4px solid !important;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .nav-tabs .nav-link {
+            border: 1px solid transparent;
+            border-top-left-radius: .25rem;
+            border-top-right-radius: .25rem;
+            color: var(--nav-light);
+            font-size: 20px;
+        }
+
+        .nav-tabs .nav-link:focus, .nav-tabs .nav-link:hover {  /* override default MDBootstrap behavior */
+            border-color: transparent;
+        }
+
+        .icon-easywp {
+            fill: var(--nav-dark);
+        }
+
+    }
+
+    @media screen and (max-width: 1018px) {  /* for hamburger navbar */
+
+        /* show hamburger only on small screens */
+        .navbar-desktop {
+            display: none !important;
+        }
+
+        /* override default MDBootstrap behavior: remove radius and white border at the bottom */
+        .nav-tabs .nav-link {
+            border: none;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+        }
+        
+        /* default color of all menu items */
+        .navbar-dark .navbar-brand, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
+            color: var(--nav-light);
+        }
+
+        /* default behavior for navbar-brand is to change to the white color. This snippet removes hover animation at all */
+        .navbar-dark .navbar-brand:hover {
+            color: var(--nav-light);
+        }
+
+        /* switch to darker color on hover for the active menu item */
+        .navbar.navbar-dark .navbar-nav .nav-item.active>span>.nav-link:hover {
+            color: var(--nav-dark);
+        }
+        
+        /* switch to darker color on hover for all other (inactive) menu items */
+        .navbar.navbar-dark .navbar-nav .nav-item>span>.nav-link:hover {
+            color: var(--nav-dark);
+        }
+
+        /* switch the easywp icon to darker color on hover for the easywp menu item */
+        #easywp-tab:hover .icon-easywp {
+            fill: var(--nav-dark);
+        }
+        
+        /* override animation (default color is white for MDBootstrap). The second selector is the easywp icon that doesn't get animated along with the text */
+        .navbar.navbar-dark .navbar-nav .nav-item .nav-link, #easywp-tab .icon-easywp {
+            transition-property: all;
+            transition-duration: 0.35s;
+            transition-timing-function: ease;
+            transition-delay: 0s;
+        }
+
+        /* make background color lighter for the active item */
+        .nav-tabs .nav-item.show .nav-link, .nav-tabs .nav-link.active {
+            background-color: var(--stylish-color-active);
+        }
+
+        .icon-easywp {
+            fill: var(--nav-light);
+        }
+
+    }
+
+    /**
+     * Style for the svg icon which is the only one different from the other icons 
+     * the were downloaded from awesomefont. These style block makes it similar to 
+     * the awesomefont icons.
+     */
+    .icon-easywp {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        stroke-width: 0;
+        stroke: currentColor;
+        /* fill: currentColor; */
+        margin-bottom: 3px;  /* this margin lines up the icon with awesomefont icons */
+        margin-left: 3px;
+    }
+
+    .btn-nav {
+        padding: .42rem 1.07rem;
+    }
+
+
+    /* Custom Colors */
+
+    .btn.stylish-color {
+        color: var(--stylish-light);
+    }
+
+    .btn.unique-color {
+        color: var(--unique-light);
+    }
+
+    .btn-red {
+        color: var(--stylish-red-light);
+    }
+
+    .btn.stylish-warning {
+        background-color: var(--stylish-warning);
+        color: var(--stylish-color);
+    }
+
+    .btn.stylish-success {
+        background-color: var(--stylish-success);
+        color: var(--stylish-color);
+    }
+
+    .input-group-text-info {
+        background-color: var(--stylish-light);
+        border: 1px solid var(--nav-dark);
+    }
+
+    .success-progress {
+        background-color: var(--success-progress);
+    }
+
+    .warning-progress {
+        background-color: var(--warning-progress);
+    }
+
+    .danger-progress {
+        background-color: var(--danger-progress);
+    }
+
+    .info-progress {
+        background-color: var(--info-progress)
+    }
+
+    /* End of Custom Colors */
+
+    .btn-group {
+        margin: .375rem;
+    }
+
+    .btn.btn-form {
+        margin-bottom: 0rem;
+        margin-left: 0rem;
+        margin-right: 0rem;
+        margin-top: 1rem;
+        font-size: .81rem;
+        padding: .6rem 1.6rem;
+    }
+
+    .input-group-prepend, .form-control {
+        margin-top: 1rem;
+    }
+
+    .p-col {  /* makes the same padding as the col class */
+
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    input {
+        min-width: 150px;
+    }
+
+    .input-group {
+        margin-top: 1rem;
+    }
+
+    @media screen and (max-width: 1340px) {
+        .hide-backups {
+            display: none !important;
+        }
+    }
+
+    /* custom queries*/
+
+    .col-xl-smaller-6, .col-xl-smaller-12 {
+        position: relative;
+        width: 100%;
+        padding-right: 15px;
+        padding-left: 15px;
+    }
+
+    @media screen and (min-width: 1132px) {
+        .col-xl-smaller-6 {
+            flex: 0 0 50%;
+            max-width: 50%;
+        }
+
+        .col-xl-smaller-12 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        .tab-content {
+            margin-top: 84px;
+        }
+
+        .tab-content #files-backups {
+            margin-top: -26px;
+        }
+    }
+
+    @media screen and (max-width: 1131px) {
+        .tab-content {
+            margin-top: 3em;
+        }
+    }
+
+    /* decrease paddings in two times once adminer button don't fit into the screen width */
+    @media screen and (max-width: 400px) {
+        .btn {
+            padding: .42rem 1.07rem;
+        }
+    }
+
+    /* group button on the easywp tab into a column once they are not fit into one row */
+    @media screen and (max-width: 553px) {
+        .easywp-row {
+            flex-direction: column;
+        }
+    }
+
+    /* end of custom queries */
+
+
+    /* hamburger animation */
+
+    .animated-ham-icon {
+        width: 30px;
+        height: 20px;
+        position: relative;
+        margin: 0px;
+        -webkit-transform: rotate(0deg);
+        -moz-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+        -webkit-transition: .5s ease-in-out;
+        -moz-transition: .5s ease-in-out;
+        -o-transition: .5s ease-in-out;
+        transition: .5s ease-in-out;
+        cursor: pointer;
+    }
+
+    .animated-ham-icon span {
+        display: block;
+        position: absolute;
+        height: 3px;
+        width: 100%;
+        border-radius: 9px;
+        opacity: 1;
+        left: 0;
+        -webkit-transform: rotate(0deg);
+        -moz-transform: rotate(0deg);
+        -o-transform: rotate(0deg);
+        transform: rotate(0deg);
+        -webkit-transition: .25s ease-in-out;
+        -moz-transition: .25s ease-in-out;
+        -o-transition: .25s ease-in-out;
+        transition: .25s ease-in-out;
+    }
+
+    .animated-ham-icon span {
+        background: var(--nav-light);
+    }
+
+    .animated-ham-icon span:nth-child(1) {
+        top: 0px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon span:nth-child(2) {
+        top: 10px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon span:nth-child(3) {
+        top: 20px;
+        -webkit-transform-origin: left center;
+        -moz-transform-origin: left center;
+        -o-transform-origin: left center;
+        transform-origin: left center;
+    }
+
+    .animated-ham-icon.open span:nth-child(1) {
+        -webkit-transform: rotate(45deg);
+        -moz-transform: rotate(45deg);
+        -o-transform: rotate(45deg);
+        transform: rotate(45deg);
+        top: 0px;
+        left: 8px;
+    }
+
+    .animated-ham-icon.open span:nth-child(2) {
+        width: 0%;
+        opacity: 0;
+    }
+
+    .animated-ham-icon.open span:nth-child(3) {
+        -webkit-transform: rotate(-45deg);
+        -moz-transform: rotate(-45deg);
+        -o-transform: rotate(-45deg);
+        transform: rotate(-45deg);
+        top: 21px;
+        left: 8px;
+    }
+
+    /* end of hamburger animation */
 
 </style>
 
@@ -3141,141 +3539,219 @@ $(document).ready(function() {
 
 <?php if (authorized()): ?>
 <body>
-    <div class="container-fluid h-100">
-        <div class="row">
-            <div class="col-6" id="left-half">
-                
+
+<svg aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden;" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<defs>
+<symbol id="icon-easywp" viewBox="0 0 20 20">
+<title>easywp</title>
+<path id="easywp-icon-path" d="M19.736 12.277c0-0.748-0.287-1.099-0.749-1.099-0.143 0-0.271 0.032-0.367 0.096-0.701 1.162-1.323 1.672-2.374 1.672-0.908 0-1.53-0.366-1.88-1.067 1.084-2.022 1.832-3.678 1.832-5.955 0-3.933-2.231-5.924-6.199-5.924s-6.199 1.99-6.199 5.924c0 2.277 0.749 3.933 1.832 5.955-0.351 0.701-0.972 1.067-1.88 1.067-1.052 0-1.673-0.51-2.374-1.672-0.096-0.064-0.223-0.096-0.367-0.096-0.462 0-0.749 0.35-0.749 1.099 0 1.815 1.609 3.312 3.936 3.312 0.606 0 1.243-0.096 1.944-0.35-0.924 2.293-1.944 2.771-3.314 2.436-0.351 0.175-0.462 0.541-0.462 0.828 0 0.764 0.797 1.497 2.438 1.497 2.358 0 4.207-1.481 4.924-4.634 0.080-0.080 0.143-0.143 0.271-0.143s0.191 0.064 0.271 0.143c0.717 3.153 2.565 4.634 4.924 4.634 1.641 0 2.438-0.732 2.438-1.497 0-0.287-0.112-0.653-0.462-0.828-1.37 0.334-2.39-0.143-3.314-2.436 0.701 0.255 1.339 0.35 1.944 0.35 2.326 0 3.936-1.497 3.936-3.312z"></path>
+</symbol>
+</defs>
+</svg>
+
+<div class="container-fluid">
+
+    <div class="row justify-content-end stylish-color shadow navbar-desktop">
+        <div class="col-6">
+            <ul class="nav nav-tabs nav-justified" id="nav-tab" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link files-tab" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files<span class="hide-backups">&amp;Backups</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link database-tab" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a>
+                </li>
+            </ul>
+        </div>
+        <div class="col my-auto">
+            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+            <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+        </div>
+    </div>
+
+    <!--Navbar-->
+    <nav class="navbar navbar-dark stylish-color navbar-hamburger">
+
+        <!-- Navbar brand -->
+        <span class="navbar-brand" style="font-weight: bold;">EasyWP Debugger</span>
+
+        <!-- Collapse button -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#menuContent" aria-controls="menuContent" aria-expanded="false" aria-label="Toggle navigation">
+            <div class="animated-ham-icon">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </button>
+
+        <!-- Collapsible content -->
+        <div class="collapse navbar-collapse" id="menuContent">
+
+            <!-- Links -->
+            <ul class="navbar-nav mr-auto nav-tabs" id="nav-tab" role="tablist">
+                <li class="nav-item">
+                    <!-- span with data-toggle is wrapper because bootstrap doesn't support mupltiple data-toggle on one element. The data-toogles on each menu item is "collapse" and "tab". -->
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link files-tab" id="files-tab" data-toggle="tab" href="#files-backups" role="tab" aria-controls="files" aria-selected="false"><i class="fas fa-file-alt fa-fw">&nbsp;</i>Files&amp;Backups</a></span>
+                </li>
+                <li class="nav-item">
+                    <span data-toggle="collapse" data-target="#menuContent"><a class="nav-link database-tab" id="database-tab" data-toggle="tab" href="#database" role="tab" aria-controls="database" aria-selected="false"><i class="fas fa-database fa-fw">&nbsp;</i>Database</a></span>
+                </li>
+                <li>
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn btn-nav unique-color float-left mr-5" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+                            <button type="button" class="btn btn-nav btn-red float-left" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+            <!-- Links -->
+
+        </div>
+        <!-- Collapsible content -->
+
+    </nav>
+    <!--/.Navbar-->
+
+    <div class="row h-100">
+        <div class="tab-content col-xl-smaller-6" id="tab-content">
+            <div class="tab-pane fade show active" id="easywp" role="tabpanel" aria-labelledby="easywp-tab">
+                <div class="row easywp-row text-center">
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFlush">Flush Cache</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFixFilesystem">Fix Filesystem</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnFixPlugin">Fix EasyWP Plugin</button>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="debug" role="tabpanel" aria-labelledby="debug-tab">
+                <div class="row text-center">
+                    <div class="col" style="margin-left: 6px;">
+                        <div class="btn-group" role="group" aria-label="Debug Group">
+                            <button type="button" class="btn stylish-success" id="btnDebugOn">Enable Debug</button>
+                            <button type="button" class="btn stylish-warning" id="btnDebugOff">Disable Debug</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-5 text-center">
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnReplace">Replace Default Files</button>
+                    </div>
+                    <div class="col">
+                        <button type="button" class="btn unique-color" id="btnActivate">Activate Clean 2019 Theme</button>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="files-backups" role="tabpanel" aria-labelledby="files-tab">
                 <div class="row">
-                    <form id="extract-form">
-                        <div class="form-group input-group mb-0">
-                            <div class="input-group-prepend">
-                                <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
-                            </div>
-                            <input type="text" class="form-control" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip" required>
+                    <div class="col-xl-smaller-12 col-md-11">
+                        <form id="extract-form">
+                            <div class="form-group input-group mb-0">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">Extract a ZIP archive</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="zip-file-extract" name="zip-file-extract" placeholder="file.zip" required>
 
-                            <div class="input-group-prepend">
-                                <div class="input-group-text input-group-text-info ml-3">To</div>
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">To</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="dest-dir" name="dest-dir" placeholder="destination/folder">
+                                <span class="input-group-btn">
+                                    <button type="submit" class="btn btn-form stylish-color" id="btnExtract">Submit</button>
+                                </span>
                             </div>
-                            <input type="text" class="form-control" id="dest-dir" name="dest-dir" placeholder="destination/folder">
-                            <span class="input-group-btn ml-3">
-                                <button type="submit" class="btn btn-secondary" id="btnExtract">Submit</button>
-                            </span>
-                        </div>
-                        <small id="dest-dir-help" class="form-text text-muted mb-1" style="margin-left: 425px;">Website root directory by default.</small>
-                    </form>
+                            <small id="dest-dir-help" class="form-text text-muted" style="margin-left: 51.5%">Destination directory is the website root directory by default.</small>
+                        </form>
+                    </div>
                 </div>
 
-                <div class="row mt-2">
-                    <form id="archive-form">
-                        <div class="form-group input-group">
+                <div class="row mt-4" id="archive-form-row">
+                    <div class="col-xl-smaller-12 col-md-10">
+                        <form id="archive-form">
+                            <div class="form-group input-group">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">Compress</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="folder-archive" name="folder-archive" placeholder="root-directory">
 
-                            <div class="input-group-prepend">
-                                <div class="input-group-text input-group-text-info">Compress</div>
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text input-group-text-info">To</div>
+                                </div>
+                                <input type="text" class="form-control mr-3" id="archive-name" name="archive-name" placeholder="">
+                                <span class="input-group-btn">
+                                    <button type="submit" class="btn btn-form stylish-color" id="btnArchive">Submit</button>
+                                </span>
                             </div>
-                            <input type="text" class="form-control" id="folder-archive" name="folder-archive" placeholder="root-directory" style="width: 200px;">
-
-                            <div class="input-group-prepend">
-                                <div class="input-group-text input-group-text-info ml-3">To</div>
-                            </div>
-                            <input type="text" class="form-control" id="archive-name" name="archive-name" placeholder="" style="width: 260px;">
-                            <span class="input-group-btn ml-3">
-                                <button type="submit" class="btn btn-secondary" id="btnArchive">Submit</button>
-                            </span>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
 
-                <div class="row mt-3">
+                <div class="row mt-4 mb-0 p-col">
                     <form id="view-form">
-                        <div class="form-group input-group">
+                        <!-- margins have to be duplicated because otherwise they are overriden by default form-group ones -->
+                        <div class="form-group input-group mt-4 mb-0">
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info">View content of a ZIP archive</div>
                             </div>
-                            <input type="text" class="form-control form" id="zip-file-view" name="zip-file-view" placeholder="file.zip" required>
-                            <span class="input-group-btn ml-3">
-                                <button type="submit" class="btn btn-secondary" id="btnView">Submit</button>
+                            <input type="text" class="form-control mr-3" id="zip-file-view" name="zip-file-view" placeholder="file.zip" required>
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-form stylish-color" id="btnView">Submit</button>
                             </span>
                         </div>
                     </form>
                 </div>
 
-                <div class="row mt-3">
+                <div class="row mt-5 p-col">
                     <form id="delete-form">
                         <div class="form-group input-group">
                             <div class="input-group-prepend">
                                 <div class="input-group-text input-group-text-info">Delete folder/file</div>
                             </div>
-                            <input type="text" class="form-control form" id="delete-entry" name="delete-file" placeholder="path/to/folder" required>
-                            <span class="input-group-btn ml-3">
-                                <button type="submit" class="btn btn-secondary" id="btnDelete">Submit</button>
+                            <input type="text" class="form-control mr-3" id="delete-entry" name="delete-file" placeholder="path/to/folder" required>
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-form stylish-color" id="btnDelete">Submit</button>
                             </span>
                         </div>
                     </form>
                 </div>
-
             </div>
-
-            <div class="col-6" id="right-half">
-
-                <div class="row">
-                    <div class="col">
-                        <button type="button" class="btn btn-info" id="btnFlush">Flush Cache</button>
-                    </div>
-                    <div class="col-5">
-                        <div class="btn-group" role="group" aria-label="Debug Group">
-                            <button type="button" class="btn btn-success" id="btnDebugOn">Enable Debug</button>
-                            <button type="button" class="btn btn-warning" id="btnDebugOff">Disable Debug</button>
-                        </div>
-                    </div>
-                    <div class="col">
-                        <button type="button" class="btn btn-info" id="btnReplace">Replace Default Files</button>
-                    </div>
-                </div>
-
-                <div class="row mt-4">
-                    <div class="col-8">
+            <div class="tab-pane fade" id="database" role="tabpanel" aria-labelledby="database-tab">
+                <div class="row justify-content-center">
+                    <div class="col-xs-smaller-12">
                         <div class="btn-group" role="group" aria-label="Adminer Group">
-                            <button type="button" class="btn btn-success" id="btnAdminerOn">Enable Adminer</button>
-                            <button type="button" class="btn btn-secondary" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
-                            <button type="button" class="btn btn-warning" id="btnAdminerOff">Disable Adminer</button>
+                            <button type="button" class="btn stylish-success" id="btnAdminerOn">Enable Adminer</button>
+                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
+                            <button type="button" class="btn stylish-warning" id="btnAdminerOff">Disable Adminer</button>
                         </div>
                     </div>
-                    <div class="col-4">
-                        <button type="button" class="btn btn-info" id="btnActivate">Activate Clean 2019 Theme</button>
-                    </div>
                 </div>
-
-                <div class="row mt-4">
-                    <div class="col">
-                        <button type="button" class="btn btn-info" id="btnFixFilesystem">Fix FileSystem</button>
-                    </div>
-                    <div class="col">
-                        <button type="button" class="btn btn-info" id="btnFixPlugin">Fix EasyWP Plugin</button>
-                    </div>
-                    <div class="col">
-                        <button type="button" class="btn btn-info" id="btnAutoLogin"><i class="fas fa-user"></i> Log into wp-admin</button>
-                    </div>
-                </div>
-
-                <div class="row mt-4">                    
-                    <div class="col-md-5 offset-md-7">
-                        <button type="button" class="btn btn-danger" id="btnSelfDestruct"><i class="fas fa-trash"></i> Remove File From Server</button>
-                    </div>
-                </div>
-
             </div>
         </div>
-
-        <div class="row d-flex justify-content-center">
-            <div class="col-8">
-                <div class="progress mt-3 d-none" style="height: 23px;" id="progress-container"></div>
+        <div class="col-xl-smaller-6 mt-5">
+            <div class="row mb-3 d-none" id="progress-row">
+                <div class="col-12">
+                    <div class="progress" style="height: 23px;" id="progress-container"></div>
+                </div>
             </div>
-        </div>
-
-        <div class="row mt-3 d-flex justify-content-center">
-            <div class="col-8">
-                <div class="panel panel-primary" id="result-panel">
-                    <div class="panel-heading"><h3 class="panel-title">Progress Log</h3>
+            <div class="row">
+                <div class="col-12 panel panel-primary" id="result-panel">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">Progress Log</h3>
                     </div>
                     <div class="panel-body">
                         <ul class="progress-log list-group scrollbar-secondary border-top border-bottom rounded" id="progress-log">
@@ -3284,33 +3760,37 @@ $(document).ready(function() {
                 </div>
             </div>
         </div>
-
     </div>
+</div>
 
-    <div class="alert alert-success alert-dismissible fade d-none version-notification" id="version-new" role="alert">
-      <strong>New version is out!</strong> <br> Check it <a href="https://collab.namecheap.net/display/~artyomperepelitsa/EasyWP+Debugger" class="text-info">here</a>
-      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-        <span aria-hidden="true">&times;</span>
-      </button>
-    </div>
+<div class="alert alert-success alert-dismissible fade d-none version-notification" id="version-new" role="alert">
+  <strong>New version is out!</strong> <br> Check it <a href="https://collab.namecheap.net/display/~artyomperepelitsa/EasyWP+Debugger" class="text-info">here</a>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
 
-    <div class="alert alert-danger alert-dismissible fade d-none version-notification" id="version-fail" role="alert">
-      <strong>Failed to check new version</strong>
-      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-        <span aria-hidden="true">&times;</span>
-      </button>
-    </div>
-</body>
+<div class="alert alert-danger alert-dismissible fade d-none version-notification" id="version-fail" role="alert">
+  <strong>Failed to check new version</strong>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+
 <?php else: ?>
 <body style="text-align: center;">
     <div style="padding-top: 25vh;">
         <form id="login-form" style="display: inline-block;">
             <input type="password" class="form-control mb-0" id="password" name="password" placeholder="Password" style="width: 200px;">
             <small id="password-invalid" class="form-text text-danger d-none"></small>
-            <button type="submit" class="btn btn-primary mt-3">LOG IN</button>
+            <button type="submit" class="btn unique-color mt-3">LOG IN</button>
         </form>
     </div>
-</body>
 <?php endif; ?>
+
+<!-- MDB core JavaScript -->
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.8.8/js/mdb.min.js"></script>
+
+</body>
 
 </html>
