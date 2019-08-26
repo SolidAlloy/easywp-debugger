@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.0 beta');
+define('VERSION', '2.1');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -64,7 +64,7 @@ define('FILES', 'files.txt');
 /**
  * Truncated class from wp-content/object-cache.php that can only flush all Redis caches
  */
-class WP_Object_Cache
+class Redis_Object_Cache
 {
     /**
      * The Redis client.
@@ -877,8 +877,8 @@ function flushOPcache()
 
 function flushRedis()
 {
-    $wp_object_cache = new WP_Object_Cache();
-    return $wp_object_cache->flush();
+    $redis_object_cache = new Redis_Object_Cache();
+    return $redis_object_cache->flush();
 }
 
 /**
@@ -1522,6 +1522,118 @@ function checkNewVersion()
     }
 }
 
+/**
+ * Returns the login URL of the website
+ * @return string        URL of the login page
+ */
+function getWpLoginUrl()
+{
+    $schema = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $domain = $_SERVER['HTTP_HOST'];
+    return $schema."://".$domain."/wp-login.php";
+}
+
+/**
+ * Checks if the website returns code 200
+ * @param  string $url URL to check
+ * @return bool        True if the URL returns code 200
+ */
+function websiteIsUp($url)
+{
+    $timeout = 10;
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+
+    curl_exec($ch);
+
+    if(curl_errno($ch)) {
+        curl_close($ch);
+        return false;
+    }
+
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if ($httpCode == 200) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/**
+ * Install a plugin given by the URL
+ * @param  string $url URL to install the plugin from
+ * @return bool        Success of the plugin installation
+ */
+function installPlugin($url)
+{
+    $pluginZip = substr($url, strrpos($url, '/') + 1); // get string after the last slash, containing the name of the zip file
+    $permFile = 'wp-content/plugins/'.$pluginZip;
+    $tmpFile = download_url($url, $timeout = 300);
+    if (is_wp_error($tmpFile)) {
+        return false;
+    }
+    copy($tmpFile, $permFile);
+    unlink($tmpFile);
+    WP_Filesystem();
+    $unzipFile = unzip_file($permFile, 'wp-content/plugins');
+    unlink($permFile);
+    if (is_wp_error($unzipFile)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
+ * Activates a WordPress plugin
+ * 
+ * @param  string $pluginPath Path-to-plugin-folder/path-to-plugin-main-file
+ * @return bool               Success of the activation
+ */
+function activatePlugin($pluginPath)
+{
+    $result = activate_plugin($pluginPath);
+    if (is_wp_error($result)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
+ * Deactivates a WordPress plugin
+ * 
+ * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file 
+ * @return bool                Success of the deactivation
+ */
+function deactivatePlugin($pluginPath)
+{
+    $result = deactivate_plugins($pluginPath);
+    if (is_wp_error($result)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+/**
+ * Removes a WordPress plugin
+ * @param  string $pluginFolder Name of the plugin folder
+ * @return bool                 Success of the removal
+ */
+function DeletePlugin($pluginFolder)
+{
+    $failedRemovals = rrmdir('wp-content/plugins/'.$pluginFolder);
+    if ($failedRemovals) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
 
 /*
     !!! POST request processors section !!! 
@@ -1800,6 +1912,72 @@ if (authorized()) {
                                      )));
             }
         }
+    }
+
+    /* returns the name of the pod */
+    if (isset($_POST['getPodName'])) {
+        $podName = getenv('HOSTNAME') ?? '';
+        die(json_encode(array('podName' => $podName)));
+    }
+
+    /* installs and activates the UsageDD plugin */
+    if (isset($_POST['usageEnable'])) {
+        $wpLoginUrl = getWpLoginUrl();
+        if (websiteIsUp($wpLoginUrl)) {
+            require_once('wp-blog-header.php');
+            require_once('wp-admin/includes/file.php');
+            require_once('wp-admin/includes/plugin.php');
+            if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
+                if (activatePlugin('usagedd/usagedd.php')) {
+                    $success = true;
+                    $error = '';
+                } else {
+                    $success = false;
+                    $error = 'pluginActivation';
+                }
+            } else {
+                $success = false;
+                $error = 'pluginInstallation';
+            }
+        } else {
+            $success = false;
+            $error = 'websiteDown';
+        }
+        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+        die(json_encode(array(
+                            'success' => $success,
+                            'error'   => $error,
+        )));
+    }
+
+    /* deactivates and removes the UsageDD plugin */
+    if (isset($_POST['usageDisable'])) {
+        $wpLoginUrl = getWpLoginUrl();
+        if (websiteIsUp($wpLoginUrl)) {
+            require_once('wp-blog-header.php');
+            require_once('wp-admin/includes/file.php');
+            require_once('wp-admin/includes/plugin.php');
+            if (deactivatePlugin('usagedd/usagedd.php')) {
+                if (DeletePlugin('usagedd')) {
+                    $success = true;
+                    $error = '';
+                } else {
+                    $success = false;
+                    $error = 'pluginDeletion';
+                }
+            } else {
+                $success == false;
+                $error = 'pluginDeactivation';
+            }
+        } else {
+            $success = false;
+            $error = 'websiteDown';
+        }
+        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+        die(json_encode(array(
+                            'success' => $success,
+                            'error'   => $error,
+        )));
     }
 
 }  // end of "if( authorized() )"
@@ -2416,7 +2594,7 @@ var sendAutoLoginRequest = function() {
             }
             handleEmptyResponse($("#btnAutoLogin"), jsonData);
             if (jsonData.success) {
-                printMsg('Success! You will be redirected in a second', true, 'success-progress');
+                printMsg('You will be redirected in a second.', true, 'success-progress');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
                 setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
@@ -2461,6 +2639,109 @@ var sendSelfDestructRequest = function() {
             if (jsonData.success) {
                 printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
             }
+        },
+        error: function (jqXHR, exception) {
+            handleErrors(jqXHR, exception);
+        }
+    });
+};
+
+/**
+ * Gets the pod name from the server and redirects to grafana
+ * @return null
+ */
+var sendSubResourcesRequest = function() {
+    $.ajax({
+        type: "POST",
+        timeout: 20000,
+        data: {getPodName: 'submit'},
+        success: function(response) {
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'danger-progress');
+                return;
+            }
+            handleEmptyResponse($("#btnSubResources"), jsonData);
+            if (jsonData.podName) {
+                printMsg('You will be redirected in a second.', true, 'success-progress');
+                setTimeout(function() { window.open("https://grafana.namecheapcloud.net/d/sTf0slgWk/kubernetes-pod?orgId=1&var-namespace=default&var-pod="+jsonData.podName); }, 1000);
+            } else {
+                printMsg('Fail. The the pod name was not found.', true, 'warning-progress');
+            }
+        },
+        error: function (jqXHR, exception) {
+            handleErrors(jqXHR, exception);
+        }
+    });
+};
+
+/**
+ * Sends a request to upload and activate the UsageDD plugin
+ * 
+ * @return {null}
+ */
+var sendUsageEnableRequest = function() {
+    $.ajax({
+        type: "POST",
+        timeout: 20000,
+        data: {usageEnable: 'submit'},
+        success: function(response) {
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'danger-progress');
+                return;
+            }
+            handleEmptyResponse($("#btnUsageOn"), jsonData);
+            if (jsonData.success) {
+                printMsg('The plugin has been installed. You can log into wp-admin now and check the resource usage of the website. Check this page to find out about what the numbers mean <a href="https://wordpress.org/plugins/usagedd/">https://wordpress.org/plugins/usagedd/</a>', true, 'success-progress');
+            } else if (jsonData.error == 'websiteDown') {
+                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
+            } else if (jsonData.error == 'pluginInstallation') {
+                printMsg('The plugin installation failed. Please try installing <a href="https://wordpress.org/plugins/usagedd/">UsageDD</a> manually.', true, 'warning-progress');
+            } else if (jsonData.error == 'pluginActivation') {
+                printMsg("The plugin was installed but couldn't be activated. Please try activating it manually.", true, 'warning-progress');
+            }
+            sendFlushRequest();
+        },
+        error: function (jqXHR, exception) {
+            handleErrors(jqXHR, exception);
+        }
+    });
+};
+
+/**
+ * Sends a request to deactivate and remove the UsageDD plugin
+ * 
+ * @return {null}
+ */
+var sendUsageDisableRequest = function() {
+    $.ajax({
+        type: "POST",
+        timeout: 20000,
+        data: {usageDisable: 'submit'},
+        success: function(response) {
+            var jsonData;
+            try {
+                jsonData = JSON.parse(response);
+            } catch (e) {
+                printMsg('The returned value is not JSON', true, 'danger-progress');
+                return;
+            }
+            handleEmptyResponse($("#btnUsageOff"), jsonData);
+            if (jsonData.success) {
+                printMsg('The plugin has been disabled.', true, 'success-progress');
+            } else if (jsonData.error == 'websiteDown') {
+                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
+            } else if (jsonData.error == 'pluginDeactivation') {
+                printMsg("The plugin deactivation failed. Please try deactivating and removing it manually.", true, 'warning-progress');
+            } else if (jsonData.error == 'pluginDeletion') {
+                printMsg("The plugin was deactivated but couldn't be removed. Please try removing it manually.", true, 'warning-progress');
+            }
+            sendFlushRequest();
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
@@ -3051,6 +3332,18 @@ $(document).ready(function() {
         sendSelfDestructRequest();
     });
 
+    $("#btnSubResources").click(function() {
+        sendSubResourcesRequest();
+    });
+
+    $('#btnUsageOn').click(function() {
+        sendUsageEnableRequest();
+    });
+
+    $('#btnUsageOff').click(function() {
+        sendUsageDisableRequest();
+    });
+
 });
 
 </script>
@@ -3421,13 +3714,6 @@ $(document).ready(function() {
         }
     }
 
-    /* group button on the easywp tab into a column once they are not fit into one row */
-    @media screen and (max-width: 553px) {
-        .easywp-row {
-            flex-direction: column;
-        }
-    }
-
     /* end of custom queries */
 
 
@@ -3627,15 +3913,26 @@ $(document).ready(function() {
     <div class="row h-100">
         <div class="tab-content col-xl-smaller-6" id="tab-content">
             <div class="tab-pane fade show active" id="easywp" role="tabpanel" aria-labelledby="easywp-tab">
-                <div class="row easywp-row text-center">
-                    <div class="col">
+                <div class="row text-center">
+                    <div class="col-sm-4">
                         <button type="button" class="btn unique-color" id="btnFlush">Flush Cache</button>
                     </div>
-                    <div class="col">
+                    <div class="col-sm-4">
                         <button type="button" class="btn unique-color" id="btnFixFilesystem">Fix Filesystem</button>
                     </div>
-                    <div class="col">
+                    <div class="col-sm-4">
                         <button type="button" class="btn unique-color" id="btnFixPlugin">Fix EasyWP Plugin</button>
+                    </div>
+                </div>
+                <div class="row mt-5 text-center">
+                    <div class="col-sm-5">
+                        <button type="button" class="btn stylish-color" id="btnSubResources">Subscription Resources</button>
+                    </div>
+                    <div class="col-sm-7">
+                        <div class="btn-group" role="group" aria-label="Usage Group">
+                            <button type="button" class="btn stylish-success" id="btnUsageOn">Enable UsageDD</button>
+                            <button type="button" class="btn stylish-warning" id="btnUsageOff">Disable UsageDD</button>
+                        </div>
                     </div>
                 </div>
             </div>
