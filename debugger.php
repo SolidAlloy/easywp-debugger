@@ -244,8 +244,8 @@ class Redis_Object_Cache
                     $predis = $plugin_dir . '/wp-nc-easywp/plugin/Http/Redis/includes/predis.php';
                     if (!file_exists($predis)) {
                         die(json_encode(array(
-                            'redis_success' => 0,
-                            'varnish_success' => 0,
+                            'redis_success' => false,
+                            'varnish_success' => false,
                             'errors' => array('Failed to find Redis. Are you using Debugger on EasyWP? Try fixing the EasyWP plugin.')
                         )));
                     }
@@ -1480,18 +1480,18 @@ function unzipArchivePost($archiveName)
     try {
         $result = unzipArchive($archiveName, $_POST['destDir'], $startNum, $_POST['maxUnzipTime']);  // try extracting archive
         if ($result === true) {
-            die(json_encode(array('success' => 1,
+            die(json_encode(array('success' => true,
                                   'error' => '',
                                   'startNum' => 0,
                                   'failedFile' => '')));
         } else {
-            die(json_encode(array('success' => 0,
+            die(json_encode(array('success' => false,
                                   'error' => '',
                                   'startNum' => $result[0],
                                   'failedFile' => $result[1])));
         }
     } catch (Exception $e) {
-        die(json_encode(array('success' => 0,
+        die(json_encode(array('success' => true,
                               'error' => $e->getMessage(),
                               'startNum' => 0,
                               'failedFile' => '')));
@@ -1508,11 +1508,11 @@ function viewArchivePost($archiveName)
     try {
         $files = viewArchive($archiveName);
     } catch (Exception $e) {
-        die(json_encode(array('success' => 0,
+        die(json_encode(array('success' => false,
                               'files' => [],
                               'error' => $e->getMessage())));
     }
-    die(json_encode(array('success' => 1,
+    die(json_encode(array('success' => true,
                           'files' => $files,
                           'error' => '')));
 }
@@ -1579,7 +1579,7 @@ function processArchiveRequest()
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of complete fail
         unlink(FILES);
-        return json_encode(array('success' => 0,
+        return json_encode(array('success' => false,
                                  'error' => $e->getMessage(),
                                  'startNum' => 0,
                                 ));
@@ -1598,7 +1598,7 @@ function processArchiveRequest()
                                  'startNum' => 0,
                                 ));
     } else {
-        return json_encode(array('success' => 0,
+        return json_encode(array('success' => false,
                                  'error' => '',
                                  'startNum' => $result,  // return the number of file on which the compression stopped
                                 ));
@@ -1803,6 +1803,120 @@ function login($password)
 }
 
 
+function usageEnable()
+{
+    $wpLoginUrl = getWpLoginUrl();
+    if (websiteIsUp($wpLoginUrl)) {
+        require_once('wp-blog-header.php');
+        require_once('wp-admin/includes/file.php');
+        require_once('wp-admin/includes/plugin.php');
+        if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
+            if (activatePlugin('usagedd/usagedd.php')) {
+                $success = true;
+                $error = '';
+            } else {
+                $success = false;
+                $error = 'pluginActivation';
+            }
+        } else {
+            $success = false;
+            $error = 'pluginInstallation';
+        }
+    } else {
+        $success = false;
+        $error = 'websiteDown';
+    }
+    http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+
+    return [
+        'success' => $success,
+        'error' => $error,
+    ];
+}
+
+
+function usageDisable()
+{
+    $wpLoginUrl = getWpLoginUrl();
+    if (websiteIsUp($wpLoginUrl)) {
+        require_once('wp-blog-header.php');
+        require_once('wp-admin/includes/file.php');
+        require_once('wp-admin/includes/plugin.php');
+        if (deactivatePlugin('usagedd/usagedd.php')) {
+            if (DeletePlugin('usagedd')) {
+                $success = true;
+                $error = '';
+            } else {
+                $success = false;
+                $error = 'pluginDeletion';
+            }
+        } else {
+            $success == false;
+            $error = 'pluginDeactivation';
+        }
+    } else {
+        $success = false;
+        $error = 'websiteDown';
+    }
+
+    http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+
+    return [
+        'success' => $success,
+        'error' => $error,
+    ];
+}
+
+
+function selfDestruct()
+{
+    session_destroy();
+    $files = array('wp-admin/adminer-auto.php',
+                   'wp-admin/adminer.php',
+                   'wp-admin/adminer.css',
+                    __FILE__);
+    foreach($files as $file) {
+        unlink($file);
+    }
+
+    // disable debug, remove UsageDD, and clear cache silently because if it fails, nothing else can be done anyway
+    wpConfigClear();
+    usageDisable();
+    clearAll();
+}
+
+
+function cronCreate()
+{
+    $timeout = 20;
+    $data = [
+        'domain' => $_SERVER['HTTP_HOST'],
+    ];
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/create');
+    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'charset=UTF-8',
+    ]);
+    curl_setopt($curl, CURLOPT_POST, 1);
+    curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+
+    curl_exec($ch);
+
+    if(curl_errno($ch)) {
+        curl_close($ch);
+        return false;
+    }
+
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if ($httpCode == 200) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
 /*
     !!! POST request processors section !!! 
 */
@@ -1826,6 +1940,13 @@ if (isset($_POST['login'])) {
     )));
 }
 
+/* removes debugger.php and additional files from the server, disables debug. Doesn't require login */
+if (isset($_POST['selfDestruct']) || isset($_GET['selfDestruct'])) {
+    selfDestruct();
+    require_once('slfekjsef.php');
+    die(json_encode(array('success' => true)));
+}
+
 // if the Debugger session is created, process POST requests
 if (authorized()) {
 
@@ -1838,19 +1959,19 @@ if (authorized()) {
 
     /* enables errors on-screen */
     if (isset($_POST['debugOn'])) {
-        $debug_result = wpConfigPut() ? 1 : 0;
+        $debug_result = wpConfigPut();
         die(json_encode(array('debug_on_success' => $debug_result)));
     }
 
     /* disables on-screen errors */
     if (isset($_POST['debugOff'])) {
-        $debug_result = wpConfigClear() ? 1 : 0;
+        $debug_result = wpConfigClear();
         die(json_encode(array('debug_off_success' => $debug_result)));
     }
 
     /* replaces WordPress default files (latest version of WordPress) */
     if (isset($_POST['replace'])) {
-        $result = replaceDefaultFiles() ? 1 : 0;
+        $result = replaceDefaultFiles();
         echo json_encode(array('replace_success' => $result));
         exit;
     }
@@ -1885,33 +2006,16 @@ if (authorized()) {
 
     /* fixes the EasyWP plugin if its files are not fully present on the website */
     if (isset($_POST['fixPlugin'])) {
-        $symLink = createEasyWpSymLink() ? 1 : 0;
-        $objectCache = createObjectCache() ? 1 : 0;
+        $symLink = createEasyWpSymLink();
+        $objectCache = createObjectCache();
         echo json_encode(array('symLink' => $symLink, 'objectCache' => $objectCache));
         exit();
-    }
-
-    /* removes debugger.php and additional files from the server, disables debug */
-    if (isset($_POST['selfDestruct'])) {
-        session_destroy();
-        $files = array('wp-admin/adminer-auto.php',
-                       'wp-admin/adminer.php',
-                       'wp-admin/adminer.css',
-                        __FILE__);
-        foreach($files as $file) {
-            unlink($file);
-        }
-
-        wpConfigClear();  // disable debug and clear cache silently because if it fails, nothing else can be done anyway
-        clearAll();
-
-        die(json_encode(array('success' => 1)));
     }
 
     /* fix filesystem not being able to find some files by running stat() on all files */
     if (isset($_POST['fixFileSystem'])) {
         statAllFiles('/var/www/wptbox');
-        echo json_encode(array('success' => 1));
+        echo json_encode(array('success' => true));
         exit();
     }
 
@@ -1923,9 +2027,9 @@ if (authorized()) {
                                         );
         if (uploadFiles($adminerFilesAndSources)) {
             $_SESSION['debugger_adminer'] = true;
-            die(json_encode(array('success' => 1)));
+            die(json_encode(array('success' => true)));
         } else {
-            die(json_encode(array('success' => 0)));
+            die(json_encode(array('success' => false)));
         }
     }
 
@@ -1935,7 +2039,7 @@ if (authorized()) {
         unlink('wp-admin/adminer.php');
         unlink('wp-admin/adminer.css');
         unset($_SESSION['debugger_adminer']);
-        die(json_encode(array('success' => 1)));
+        die(json_encode(array('success' => true)));
     }
 
     /* prints success=true if the destination directory of extraction exists or has been successfully created */
@@ -1964,11 +2068,11 @@ if (authorized()) {
         try {
             $number = countFiles($_POST['filesNumber']);
         } catch (Exception $e) {
-            die(json_encode(array('success' => 0,
+            die(json_encode(array('success' => true,
                                   'number' => 0,
                                   'error' => $e->getMessage())));
         }
-        die(json_encode(array('success' => 1,
+        die(json_encode(array('success' => true,
                               'number' => $number,
                               'error' => '')));
     }
@@ -2052,7 +2156,7 @@ if (authorized()) {
     }
 
     /* deletes a file or folder from the hosting storage */
-    if (isset($_POST['delete'])) {
+    if (isset($_POST['deleteEntry'])) {
         $entry = $_POST['entry'];
         if (!file_exists($entry)) {  // if entry does not exist
             die(json_encode(array('success' => false ,
@@ -2094,64 +2198,15 @@ if (authorized()) {
 
     /* installs and activates the UsageDD plugin */
     if (isset($_POST['usageEnable'])) {
-        $wpLoginUrl = getWpLoginUrl();
-        if (websiteIsUp($wpLoginUrl)) {
-            require_once('wp-blog-header.php');
-            require_once('wp-admin/includes/file.php');
-            require_once('wp-admin/includes/plugin.php');
-            if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
-                if (activatePlugin('usagedd/usagedd.php')) {
-                    $success = true;
-                    $error = '';
-                } else {
-                    $success = false;
-                    $error = 'pluginActivation';
-                }
-            } else {
-                $success = false;
-                $error = 'pluginInstallation';
-            }
-        } else {
-            $success = false;
-            $error = 'websiteDown';
-        }
-        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
-        die(json_encode(array(
-                            'success' => $success,
-                            'error'   => $error,
-        )));
+        $result = usageEnable();
+        die(json_encode($result));
     }
 
     /* deactivates and removes the UsageDD plugin */
     if (isset($_POST['usageDisable'])) {
-        $wpLoginUrl = getWpLoginUrl();
-        if (websiteIsUp($wpLoginUrl)) {
-            require_once('wp-blog-header.php');
-            require_once('wp-admin/includes/file.php');
-            require_once('wp-admin/includes/plugin.php');
-            if (deactivatePlugin('usagedd/usagedd.php')) {
-                if (DeletePlugin('usagedd')) {
-                    $success = true;
-                    $error = '';
-                } else {
-                    $success = false;
-                    $error = 'pluginDeletion';
-                }
-            } else {
-                $success == false;
-                $error = 'pluginDeactivation';
-            }
-        } else {
-            $success = false;
-            $error = 'websiteDown';
-        }
-        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
-        die(json_encode(array(
-                            'success' => $success,
-                            'error'   => $error,
-        )));
+        $result = usageDisable();
+        die(json_encode($result));
     }
-
 }  // end of "if( authorized() )"
 
 ?>
@@ -2550,17 +2605,17 @@ var sendActivateRequest = function($button) {
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
-            if (jsonData.replace == "1" && jsonData.activate == "1") {
+            if (jsonData.replace && jsonData.activate) {
                 $button.html(doneText);
             } else {
                 $button.html(failText);
             }
-            if (jsonData.replace == "1") {
+            if (jsonData.replace) {
                 printMsg('Theme Uploaded Successfully!', false, 'success-progress');
             } else {
                 printMsg('Theme Upload Failed!', false, 'warning-progress');
             }
-            if (jsonData.activate == "1") {
+            if (jsonData.activate) {
                 printMsg('Theme Activated Successfully!', true, 'success-progress');
             } else {
                 printMsg('Theme Activation Failed!', true, 'warning-progress');
@@ -3348,7 +3403,7 @@ var processDeleteForm = function(form) {
     // send request to get filenames inside zip file
     $.ajax({
         type: "POST",
-        data: {delete: 'submit',
+        data: {deleteEntry: 'submit',
                entry: entry},
         success: function(response) {  // on success
             var jsonData;
@@ -3496,11 +3551,11 @@ $(document).ready(function() {
         sendFixPluginRequest();
     });
 
-    $("#btnAutoLogin").click(function() {
+    $(".btnAutoLogin").click(function() {
         sendAutoLoginRequest();
     });
 
-    $("#btnSelfDestruct").click(function() {
+    $(".btnSelfDestruct").click(function() {
         sendSelfDestructRequest();
     });
 
@@ -4070,8 +4125,8 @@ $(document).ready(function() {
                 <li>
                     <div class="row">
                         <div class="col">
-                            <button type="button" class="btn btn-nav unique-color float-left mr-5" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
-                            <button type="button" class="btn btn-nav btn-red float-left" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+                            <button type="button" class="btn btn-nav unique-color float-left mr-5 btnAutoLogin" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+                            <button type="button" class="btn btn-nav btn-red float-left btnSelfDestruct" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
                         </div>
                     </div>
                 </li>
