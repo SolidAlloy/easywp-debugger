@@ -62,7 +62,9 @@ define('FILES', 'files.txt');
 
 
 /**
- * Truncated class from wp-content/object-cache.php that can only flush all Redis caches
+ * Modified class from wp-content/object-cache.php.
+ * The only original method left is flush().
+ * The methods to set, get, and delete keys were added.
  */
 class Redis_Object_Cache
 {
@@ -363,7 +365,135 @@ class Redis_Object_Cache
 
         return false;
     }
+
+    /**
+     * Fetch the value of the key from Redis
+     * 
+     * @param  string $key The key to search for
+     * @return mixed       Value assigned to the key or false on failure
+     */
+    public function fetch($key)
+    {
+        return $this->redis->get($key);
+    }
+
+    /**
+     * Store the key and value for TTL seconds
+     * @param  string  $key   Key to the value
+     * @param  mixed   $value Value to store in the database
+     * @param  integer $ttl   Time-to-live in seconds
+     * @return bool           True on success
+     */
+    public function store($key, $value, $ttl)
+    {
+        return $this->redis->setEx($key, $ttl, $value);
+    }
+
+    /**
+     * Delete a key from cache
+     * @param  string $key Key to delete
+     * @return bool        True on success
+     */
+    public function delete($key)
+    {
+        $this->redis->del($key);
+    }
 }
+
+/**
+ * Factory class that can operate both APCu and Redis caches through a signle interface
+ */
+class EasyWP_Cache
+{
+    /**
+     * Type of cache the class is managing at the moment
+     * 
+     * @var string
+     */
+    protected $handler = '';
+
+    /**
+     * Redis class instance if redis handler is chosen
+     * 
+     * @var object
+     */
+    protected $redis;
+
+    /**
+     * Chooses the handler and instantiates the Redis_Object_Cache class if Redis is found.
+     */
+    public function __construct()
+    {
+        if (extension_loaded('apcu')) {
+            $this->handler = 'apcu';
+        } else {
+            $this->redis = new Redis_Object_Cache();
+            if ($this->redis->redis_status()) {
+                $this->handler = 'redis';
+            } else {
+                throw new Exception("APCu and Redis not found");
+            }
+        }
+    }
+
+    /**
+     * Returns the current handler
+     * 
+     * @return string Current cache handler. Either "apcu" or "redis"
+     */
+    public function getHandler()
+    {
+        return $this->handler;
+    }
+
+    /**
+     * Fetches the value assigned to the key in the cache
+     * 
+     * @param  mixed $key  Key to search for
+     * @return mixed       Value assigned to the key
+     */
+    public function fetch($key)
+    {
+        if ($this->handler == 'apcu') {
+            return apcu_fetch($key);
+        } else {
+            return $this->redis->fetch($key);
+        }
+    }
+
+    /**
+     * Saves a key-value sequence in the cache for TTL seconds
+     * 
+     * @param  mixed   $key   Key to store in the cache
+     * @param  mixed   $value Value to be assigned to the key
+     * @param  integer $ttl   Number in seconds for which the key will be stored in the cache
+     * @return bool           Success of setting the key
+     */
+    public function store($key, $value, $ttl)
+    {
+        if ($this->handler == 'apcu') {
+            return apcu_store($key, $value, $ttl);
+        } else {
+            return $this->redis->store($key, $value, $ttl);
+        }
+    }
+
+    /**
+     * Deletes the key from cache
+     * 
+     * @param  mixed $key Key to delete from cache
+     * @return bool       Success of the deletion
+     */
+    public function delete($key)
+    {
+        if ($this->handler == 'apcu') {
+            return apcu_delete($key);
+        } else {
+            return $this->redis->delete($key);
+        }
+    }
+}
+
 
 /**
  * This class accesses the website database even if the website is down and
@@ -691,7 +821,7 @@ class VarnishCache
             curl_close($ch);
             return $result;
         } catch (Exception $e) {
-            array_push($this->errors, $e);
+            array_push($this->errors, $e->getMessage());
             return false;
         }
     }
@@ -1634,6 +1764,44 @@ function DeletePlugin($pluginFolder)
     }
 }
 
+/**
+ * login the user if the correct password is entered and rate-limit the connection otherwise
+ * @param  string $password Password to log into debugger
+ * @return bool             Success of the login
+ */
+function login($password)
+{
+    try {
+        $cache = new EasyWP_Cache();
+    } catch (Exception $e) {
+        throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
+    }
+
+    if ($cache->getHandler() == 'redis') {
+        $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+    }
+
+    $failedLoginKey = "{$_SERVER['SERVER_NAME']}~login:{$_SERVER['REMOTE_ADDR']}";
+    $blockedKey = "{$_SERVER['SERVER_NAME']}~login-blocked:{$_SERVER['REMOTE_ADDR']}";
+
+    $tries = (int)$cache->fetch($failedLoginKey);
+    if ($tries >= 10) {
+        throw new Exception("You've exceeded the number of login attempts. We've blocked IP address {$_SERVER['REMOTE_ADDR']} for a few minutes.");
+    }
+
+    if (!passwordMatch($password)) {
+        $blocked = (int)$cache->fetch($blockedKey);
+
+        $cache->store($failedLoginKey, $tries+1, pow(2, $blocked+1)*60);  // store tries for 2^(x+1) minutes: 2, 4, 8, 16, ...
+        $cache->store($blockedKey, $blocked+1, 86400);  // store number of times blocked for 24 hours
+        return false;
+    } else {
+        $cache->delete($apcuKey);
+        $cache->delete($blockedKey);
+        return true;
+    }
+}
+
 
 /*
     !!! POST request processors section !!! 
@@ -1642,16 +1810,20 @@ function DeletePlugin($pluginFolder)
 
 /* creates session and print success if the password matches */
 if (isset($_POST['login'])) {
-    if (passwordMatch($_POST['password'])) {
-        $_SESSION['debugger'] = true;
-        die(json_encode(array(
-            'success' => 1,
-        )));
-    } else {
-        die(json_encode(array(
-            'success' => 0,
-        )));
+    try {
+        $success = login($_POST['password']);
+        $error = '';
+    } catch (Exception $exception) {
+        $success = false;
+        $error = $exception->getMessage();
     }
+    if ($success) {
+        $_SESSION['debugger'] = true;
+    }
+    die(json_encode(array(
+        'success' => $success,
+        'error' => $error,
+    )));
 }
 
 // if the Debugger session is created, process POST requests
@@ -3360,7 +3532,7 @@ var processLoginform = function(form) {
     $.ajax({
         type: "POST",
         data: {login: 'submit',
-               password: password
+               password: password,
         },
         timeout: 40000,
         success: function(response) {
@@ -3370,6 +3542,8 @@ var processLoginform = function(form) {
 
             if (jsonData.success) {
                 location.reload(true);
+            } else if (jsonData.error) {
+                printMsg(jsonData.error);
             } else {
                 printMsg('Invalid password');
             }
@@ -4078,7 +4252,7 @@ $(document).ready(function() {
 <body style="text-align: center;">
     <div style="padding-top: 25vh;">
         <form id="login-form" style="display: inline-block;">
-            <input type="password" class="form-control mb-0" id="password" name="password" placeholder="Password" style="width: 200px;">
+            <input type="password" class="form-control mb-0 mx-auto" id="password" name="password" placeholder="Password" style="width: 200px;">
             <small id="password-invalid" class="form-text text-danger d-none"></small>
             <button type="submit" class="btn unique-color mt-3">LOG IN</button>
         </form>
