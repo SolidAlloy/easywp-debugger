@@ -379,6 +379,7 @@ class Redis_Object_Cache
 
     /**
      * Store the key and value for TTL seconds
+     * 
      * @param  string  $key   Key to the value
      * @param  mixed   $value Value to store in the database
      * @param  integer $ttl   Time-to-live in seconds
@@ -391,12 +392,45 @@ class Redis_Object_Cache
 
     /**
      * Delete a key from cache
+     * 
      * @param  string $key Key to delete
      * @return bool        True on success
      */
     public function delete($key)
     {
-        $this->redis->del($key);
+        return $this->redis->del($key);
+    }
+
+    /**
+     * Get TTL of a key
+     * 
+     * @param  string $key Key of which to check TTL
+     * @return integer     TTL of the key, -1 if no TTL, -2 if no key
+     */
+    public function ttl($key)
+    {
+        return $this->redis->ttl($key);
+    }
+
+    /**
+     * Check if the key exists in cache
+     * @param  string $key Key to search for
+     * @return bool        true if the key exists
+     */
+    public function exists($key)
+    {
+        return $this->redis->exists($key);
+    }
+
+    /**
+     * Return keys matching the pattern, using '*' as a wildcard
+     * 
+     * @param  string $pattern           String containing a pattern and wildcards
+     * @return array of strings          The keys that match a certain pattern
+     */
+    public function keys($pattern)
+    {
+        return $this->redis->keys($pattern);
     }
 }
 
@@ -490,6 +524,109 @@ class EasyWP_Cache
             return apcu_delete($key);
         } else {
             return $this->redis->delete($key);
+        }
+    }
+
+    /**
+     * Gets an array of keys based on a pattern, using wildcards
+     * 
+     * @param  string $pattern           String containing a pattern to search for
+     * @return array of strings          Keys matching the pattern
+     */
+    public function keys($pattern)
+    {
+        if ($this->handler == 'apcu') {
+            $pattern = '/'.str_replace('\*', '.*', preg_quote($pattern)).'/';  // transform wildcard pattern into a PCRE regex
+            $keysArray = [];
+            foreach (new APCUIterator($pattern) as $apcuCache) {
+                array_push($keysArray, $apcuCache['key']);
+            }
+            return $keysArray;
+        } else {
+            return $this->redis->keys($pattern);
+        }
+    }
+
+    /**
+     * Gets info about the keys that must not be removed during the flush() execution
+     * 
+     * @return  array       Array with cache keys as keys and [value, ttl] as values
+     */
+    protected function getNeededKeys()
+    {
+        $keysDict = [];
+        $cronKey = 'cronCreateSent';
+        $loginKeys = $this->keys('*~login:*');
+        if ($this->exists($cronKey)) {
+            $keysDict[$cronKey] = [
+                $this->fetch($cronKey),
+                $this->ttl($cronKey),
+            ];
+        }
+        foreach ($loginKeys as $key) {
+            $keysDict[$key] = [
+                $this->fetch($key),
+                $this->ttl($key),
+            ];
+        }
+        return $keysDict;
+    }
+
+    /**
+     * Flushes apcu/redis cache except for specific keys
+     * 
+     * @return bool     Success of the flush
+     */
+    public function flush()
+    {
+        // gather all keys that must not be removed in a dict with key, value, and ttl of each key
+        $keysDict = $this->getNeededKeys();
+
+        if ($this->handler == 'apcu') {
+            $result = apcu_clear_cache();
+        } else {
+            $result = $this->redis->flush();
+        }
+
+        foreach($keysDict as $key=>$info) {
+            $this->store($key, $info[0], $info[1]);  // set keys again after the flush
+        }
+
+        return $result;
+    }
+
+    /**
+     * Gets TTL of a key
+     * 
+     * @param  string $key Key to check the TTL of
+     * @return integer     TTL  of the key, -2 if key doesn't exist
+     */
+    public function ttl($key)
+    {
+        if ($this->handler == 'apcu') {
+            $keyInfo = apcu_key_info($key);
+            if ($keyInfo) {
+                return $keyInfo['creation_time'] + $keyInfo['ttl'] - time();
+            } else {
+                return -2;
+            }
+        } else {
+            return $this->redis->ttl($key);
+        }
+    }
+
+    /**
+     * Checks if the key exists
+     * 
+     * @param  string $key Key to search for
+     * @return bool        True if the key exists
+     */
+    public function exists($key)
+    {
+        if ($this->handler == 'apcu') {
+            return apcu_exists($key);
+        } else {
+            return $this->redis->exists($key);
         }
     }
 }
@@ -971,6 +1108,75 @@ class DirZipArchive
     }
 }
 
+/**
+ * CronAPI allows to communicate with EasyWP Cron through REST API easily
+ */
+class CronAPI
+{
+    /**
+     * Time to wait for the response
+     * @var integer
+     */
+    protected $timeout = 30;
+    protected $domain;
+    protected $file = __FILE__;
+
+    public function __construct()
+    {
+        $this->domain = $_SERVER['HTTP_HOST'];
+    }
+
+    protected function sendRequest($endpoint, $method, $data=null)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
+        curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
+        if (strcasecmp($method, 'POST') == 0) {
+            curl_setopt($curl, CURLOPT_POST, 1);
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+        } elseif (strcasecmp($method, 'DELETE') == 0) {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+        }
+
+        $result = curl_exec($ch);
+
+        if(curl_errno($ch)) {
+            curl_close($ch);
+            return false;
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($httpCode == 200) {
+            return $result;
+        } else {
+            return false;
+        }
+    }
+
+    public function createCron()
+    {
+        $data = [
+            'domain' => $this->domain,
+            'file' => $file,
+        ];
+        if ($this->sendRequest('create', 'POST', $data)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public function deleteCron()
+    {
+        if ($this->sendRequest('create/'.$this->domain, 'DELETE')) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
 
 /*
     !!! PHP functions section !!!
@@ -1007,8 +1213,8 @@ function flushOPcache()
 
 function flushRedis()
 {
-    $redis_object_cache = new Redis_Object_Cache();
-    return $redis_object_cache->flush();
+    $cache = new EasyWP_Cache();
+    return $cache->flush();
 }
 
 /**
@@ -1774,7 +1980,17 @@ function login($password)
     try {
         $cache = new EasyWP_Cache();
     } catch (Exception $e) {
+        $cronAPI = CronAPI();  // since cache isn't supported here, send createCron request before checking in cache if it was already sent
+        $cronAPI->createCron();
         throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
+    }
+
+    $cronKey = 'cronCreateSent';
+    $cronCreateSent = $cache->fetch($cronKey);
+    if (!$cronCreateSent) {  // send the cron if it wasn't sent before
+        $cronAPI = CronAPI();
+        $cronAPI->createCron();
+        $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
     }
 
     if ($cache->getHandler() == 'redis') {
@@ -1886,40 +2102,10 @@ function selfDestruct()
 }
 
 
-function cronCreate()
-{
-    $timeout = 20;
-    $data = [
-        'domain' => $_SERVER['HTTP_HOST'],
-    ];
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/create');
-    curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'charset=UTF-8',
-    ]);
-    curl_setopt($curl, CURLOPT_POST, 1);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
-
-    curl_exec($ch);
-
-    if(curl_errno($ch)) {
-        curl_close($ch);
-        return false;
-    }
-
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if ($httpCode == 200) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-
 /*
     !!! POST request processors section !!! 
 */
+
 
 
 /* creates session and print success if the password matches */
@@ -1943,7 +2129,6 @@ if (isset($_POST['login'])) {
 /* removes debugger.php and additional files from the server, disables debug. Doesn't require login */
 if (isset($_POST['selfDestruct']) || isset($_GET['selfDestruct'])) {
     selfDestruct();
-    require_once('slfekjsef.php');
     die(json_encode(array('success' => true)));
 }
 
