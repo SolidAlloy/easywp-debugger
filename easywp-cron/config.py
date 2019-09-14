@@ -26,6 +26,7 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = get_database_uri() or \
         'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS') is not None
@@ -33,3 +34,5 @@ class Config(object):
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     DEFAULT_MAIL_SENDER = "EasyWP Cron <"+MAIL_USERNAME+">"
     DEFAULT_MAIL_RECIPIENT = os.environ.get('DEFAULT_MAIL_RECIPIENT')
+
+    CACHE_TYPE = os.environ.get('CACHE_TYPE') or 'simple'
