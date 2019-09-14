@@ -1,0 +1,14 @@
+Hello,
+
+The following debugger files were not removed:
+
+{% for link in links %}
+Link: {{ link.url }}
+Error: {{ link.message }}
+
+{% endfor %}
+Please try removing them manually.
+
+Sincerely,
+
+EasyWP Debugger Cron
