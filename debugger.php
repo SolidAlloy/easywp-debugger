@@ -55,6 +55,9 @@ define('DS', DIRECTORY_SEPARATOR);
 define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
 
+// send error reports regarding easywp-cron to
+define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com');
+
 
 /*
     !!! PHP classes section !!!
@@ -1118,7 +1121,17 @@ class CronAPI
      * @var integer
      */
     protected $timeout = 30;
+
+    /**
+     * Domain to which debugger was uploaded
+     * @var string
+     */
     protected $domain;
+
+    /**
+     * Name of the debugger file (wp-admin-debugger.php or debugger.php by default)
+     * @var string
+     */
     protected $file = __FILE__;
 
     public function __construct()
@@ -1126,6 +1139,29 @@ class CronAPI
         $this->domain = $_SERVER['HTTP_HOST'];
     }
 
+    /**
+     * Sends an email from the default server mailbox to a recipient defined at the start of the file
+     * 
+     * @param  string $emailBody Body of the email
+     * @param  string $endpoint  Endpoint of the easywp-cron API
+     * @return null
+     */
+    protected function sendMail($emailBody, $endpoint)
+    {
+        $subject = 'Debugger: error accessing endpoint /'.$endpoint;
+        $emailBody = "Reporter: ".$this->domain.'/'.$this->file."\n".$emailBody;
+        $headers = "X-Mailer: PHP/".phpversion();
+        mail(MAIL_RECIPIENT, $subject, $emailBody, $headers);
+    }
+
+    /**
+     * Sends a request to the API endpoint and returns output or false on fail
+     * 
+     * @param  string $endpoint Endpoint of the API
+     * @param  string $method   HTTP method to use
+     * @param  array  $data     Data to be sent in a POST request
+     * @return mixed            string of output on success or false on fail
+     */
     protected function sendRequest($endpoint, $method, $data=null)
     {
         $ch = curl_init();
@@ -1142,34 +1178,92 @@ class CronAPI
         $result = curl_exec($ch);
 
         if(curl_errno($ch)) {
+            $emailBody .= "Curl Error when trying to access /".$endpoint."\n";
+            $emailBody .= "Error: ".curl_error($ch)."\n";
+            $this->sendMail($emailBody, $endpoint);
             curl_close($ch);
             return false;
         }
 
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if ($httpCode == 200) {
+            curl_close($ch);
             return $result;
         } else {
+            $emailBody .= "Invalid status code when trying to access /".$endpoint."\n";
+            $emailBody .= "Status Code: ".$httpCode."\n";
+            $this->sendMail($emailBody, $endpoint);
+            curl_close($ch);
             return false;
         }
     }
 
+    /**
+     * Analyzes if the request failed and sends corresponding emails
+     * 
+     * @param  string   $output   String of output or false
+     * @param  string   $endpoint Endpoint of the API
+     * @return boolean            Success of the request
+     */
+    protected function analyzeRequest($output, $endpoint)
+    {
+        $result = false;
+        if ($output) {
+            $jsonData = json_decode($output);
+            if ($jsonData) {
+                if ($jsonData->success) {
+                    $result = true;
+                } else {
+                    $emailBody  = "Request to /".$endpoint." failed.\n";
+                    $emailBody .= "Reason: ".$jsonData->message."\n";
+                }
+            } else {
+                $emailBody  = "The output returned from /".$endpoint." is not JSON.\n";
+                $emailBody .= "Output: ".$output."\n";
+            }
+        } elseif ($output !== false) {  // if output is empty but not false
+            $emailBody .= "Status code was 200 but no output was returned when trying to access /".$endpoint."\n";
+        } else {  // if output is false, the corresponding email was sent by sendRequest, so no need to send another one
+            return false;
+        }
+        if ($result) {
+            return true;
+        } else {
+            $this->sendMail($emailBody, $endpoint);
+            return false;
+        }
+    }
+
+    /**
+     * Creates a cron that will delete debugger in 2 hours
+     * 
+     * @return boolean Success of the cron creation
+     */
     public function createCron()
     {
+        $endpoint = 'create';
         $data = [
             'domain' => $this->domain,
-            'file' => $file,
+            'file' => $this->file,
         ];
-        if ($this->sendRequest('create', 'POST', $data)) {
+        $output = $this->sendRequest($endpoint, 'POST', $data);
+        if ($this->analyzeRequest($output, $endpoint)) {
             return true;
         } else {
             return false;
         }
     }
 
+    /**
+     * Deletes the cron, so it will not be executed
+     * 
+     * @return boolean Success of the deletion
+     */
     public function deleteCron()
     {
-        if ($this->sendRequest('create/'.$this->domain, 'DELETE')) {
+        $endpoint = 'delete/'.$this->domain;
+        $output = $this->sendRequest($endpoint, 'DELETE');
+        if ($this->analyzeRequest($output, $endpoint)) {
             return true;
         } else {
             return false;
@@ -1980,7 +2074,7 @@ function login($password)
     try {
         $cache = new EasyWP_Cache();
     } catch (Exception $e) {
-        $cronAPI = CronAPI();  // since cache isn't supported here, send createCron request before checking in cache if it was already sent
+        $cronAPI = new CronAPI();  // since cache isn't supported here, send createCron request before checking in cache if it was already sent
         $cronAPI->createCron();
         throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
     }
@@ -1988,7 +2082,7 @@ function login($password)
     $cronKey = 'cronCreateSent';
     $cronCreateSent = $cache->fetch($cronKey);
     if (!$cronCreateSent) {  // send the cron if it wasn't sent before
-        $cronAPI = CronAPI();
+        $cronAPI = new CronAPI();
         $cronAPI->createCron();
         $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
     }
@@ -2018,7 +2112,28 @@ function login($password)
     }
 }
 
+/**
+ * Deletes the easywp cron and removes its reference from the cache
+ * @return null
+ */
+function deleteCronAndCache()
+{
+    $cronAPI = new CronAPI();
+    $cronAPI->deleteCron();
 
+    try {
+        $cache = new EasyWP_Cache();
+        $cache->delete('cronCreateSent');
+    } catch (Exception $e) {
+        // do nothing
+    }
+}
+
+/**
+ * Installs and activates the UsageDD plugin
+ * 
+ * @return array        Success of enabling and error if there was one
+ */
 function usageEnable()
 {
     $wpLoginUrl = getWpLoginUrl();
@@ -2050,7 +2165,11 @@ function usageEnable()
     ];
 }
 
-
+/**
+ * Disables and removes the UsageDD plugin
+ * 
+ * @return array       Success of enabling and error if there was one
+ */
 function usageDisable()
 {
     $wpLoginUrl = getWpLoginUrl();
@@ -2083,10 +2202,15 @@ function usageDisable()
     ];
 }
 
-
+/**
+ * Removes all the additional files and itself
+ * 
+ * @return null
+ */
 function selfDestruct()
 {
     session_destroy();
+    deleteCronAndCache();
     $files = array('wp-admin/adminer-auto.php',
                    'wp-admin/adminer.php',
                    'wp-admin/adminer.css',
