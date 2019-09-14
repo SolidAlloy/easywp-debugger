@@ -37,6 +37,7 @@ def get_queue():
     return result.stdout
 
 
+@cache.cached(timeout=60, key_prefix='queue_length')
 def get_queue_length():
     queue = get_queue()
     if not queue:

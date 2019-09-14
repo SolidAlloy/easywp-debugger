@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+
 
 setup(
     name='easywp-cron',
-    version='1.0.0',
+    version='2.2.0',
     description='EasyWP Cron REST API',
     url='https://github.com/SolidAlloy/easywp-debugger',
     author='Artem Perepelitsa',
@@ -15,4 +17,15 @@ setup(
     ],
     keywords='cron rest easywp debugger',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=['Flask', 'requests'])
+    install_requires=['alembic',
+                      'Flask',
+                      'Flask-Caching',
+                      'Flask-Mail',
+                      'Flask-Migrate',
+                      'Flask-SQLAlchemy',
+                      'Flask-SSLify',
+                      'PyMySQL',
+                      'python-dotenv',
+                      'requests',
+                      ],
+)
