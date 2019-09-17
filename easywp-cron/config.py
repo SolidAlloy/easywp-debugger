@@ -29,10 +29,12 @@ class Config(object):
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT') or 587)
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS') is not None
+    MAIL_USE_TLS = (os.environ.get('MAIL_USE_TLS') == '1' or False)
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    DEFAULT_MAIL_SENDER = "EasyWP Cron <"+MAIL_USERNAME+">"
-    DEFAULT_MAIL_RECIPIENT = os.environ.get('DEFAULT_MAIL_RECIPIENT')
+    MAIL_DEFAULT_SENDER = "EasyWP Cron <"+MAIL_USERNAME+">"
+    MAIL_DEFAULT_RECIPIENT = os.environ.get('MAIL_DEFAULT_RECIPIENT')
 
     CACHE_TYPE = os.environ.get('CACHE_TYPE') or 'simple'
+    DEBUG = (os.environ.get('DEBUG') == '1' or False)
+    FAILED_URL_HANDLER = os.environ.get('FAILED_URL_HANDLER') or 'all'
