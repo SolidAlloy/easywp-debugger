@@ -18,7 +18,7 @@ setup(
     keywords='cron rest easywp debugger',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=['alembic',
-                      'Flask',
+                      'flask',
                       'Flask-Caching',
                       'Flask-Mail',
                       'Flask-Migrate',
