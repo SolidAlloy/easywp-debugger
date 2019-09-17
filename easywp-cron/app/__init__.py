@@ -1,12 +1,14 @@
-from flask import Flask
-from config import Config
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_mail import Mail
-from flask_caching import Cache
-from flask_sslify import SSLify
 import logging
-from logging.handlers import SMTPHandler, RotatingFileHandler
+from logging.handlers import RotatingFileHandler, SMTPHandler
+
+from config import Config
+from flask import Flask
+from flask_caching import Cache
+from flask_mail import Mail
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
+from flask_sslify import SSLify
+
 
 app = Flask(__name__)
 application = app
@@ -46,7 +48,7 @@ app.logger.setLevel(logging.INFO)
 app.logger.info('EasyWP Cron Startup')
 
 
-from app import routes, models
+from app import models, routes
 
 
 if __name__ == '__main__':

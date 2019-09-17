@@ -1,5 +1,6 @@
-from app import db
 from datetime import datetime
+
+from app import db
 
 
 class Failed_URL(db.Model):
