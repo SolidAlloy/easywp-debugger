@@ -5,11 +5,27 @@ from functools import wraps
 from app import app, cache
 from flask import jsonify, url_for
 
+# Regular experessions used for the validation of input.
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
 file_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9-_]{0,30}\.php$')
 
 
 def catch_custom_exception(func):
+    """Catch exceptions not handled by the app.
+
+    Catch exceptions not handled by the app and pass their traceback to
+        the app logger (email, rotating file).
+
+    Decorators:
+        wraps
+
+    Arguments:
+        func {object} -- Function wrapped by catch_custom_exception()
+
+    Returns:
+        mixed -- Value returned by the function or the JSON string if
+            an exception is catched.
+    """
     @wraps(func)
     def decorated_function(*args, **kwargs):
         try:
