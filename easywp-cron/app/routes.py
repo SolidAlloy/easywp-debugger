@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
-from flask import request, url_for, jsonify
+from datetime import datetime, timedelta
+
+import requests
 from app import app, db
-from app.models import Failed_URL
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
-import requests
-from requests.exceptions import Timeout, TooManyRedirects, RequestException
-from datetime import datetime, timedelta
-from app.functions import check_inputs, add_job, catch_custom_exception, \
-    process_failed_inputs, find_job, delete_job
+from app.functions import (add_job, catch_custom_exception, check_inputs,
+                           delete_job, find_job, process_failed_inputs)
+from app.models import Failed_URL
+from flask import jsonify, request, url_for
+from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 
 @app.route('/create', methods=['POST'])

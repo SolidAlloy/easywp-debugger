@@ -1,8 +1,9 @@
 import re
 import subprocess
-from app import app, cache
-from flask import url_for, jsonify
 from functools import wraps
+
+from app import app, cache
+from flask import jsonify, url_for
 
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
 file_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9-_]{0,30}\.php$')

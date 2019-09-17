@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup, find_packages
-from setuptools.command.install import install
-
+from setuptools import find_packages, setup
 
 setup(
     name='easywp-cron',

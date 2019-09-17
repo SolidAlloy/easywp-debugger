@@ -1,5 +1,5 @@
 from app import application, db
-from app.models import Failed_URL, BotUser
+from app.models import BotUser, Failed_URL
 
 
 @application.shell_context_processor

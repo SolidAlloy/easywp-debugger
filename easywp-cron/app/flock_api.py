@@ -1,8 +1,9 @@
+import json
+
 import requests
-from requests.exceptions import Timeout, TooManyRedirects, RequestException
 from app import app, db
 from app.models import BotUser
-import json
+from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 
 class InvalidMethodException(Exception):
@@ -67,8 +68,8 @@ class FlockAPI:
             if channel['name'] == channel_name:
                 return channel['id']
 
-    def send_message(text, color=None, testing=True):
-        if testing:
+    def send_message(text, color=None):
+        if app.debug:
             group = FlockAPI.test_group_id
         else:
             group = FlockAPI.sme_group_id
