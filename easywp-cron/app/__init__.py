@@ -11,6 +11,7 @@ from flask_sslify import SSLify
 
 
 app = Flask(__name__)
+# WSGI must be provided with "application". "app" variable can't be used
 application = app
 app.config.from_object(Config)
 db = SQLAlchemy(app)
@@ -20,7 +21,7 @@ cache = Cache(app)
 sslify = SSLify(app, permanent=True)
 
 
-if not app.debug:
+if not app.debug:  # Use SMTPHandler only in production
     if app.config['MAIL_SERVER']:
         auth = None
         if app.config['MAIL_USERNAME'] or app.config['MAIL_PASSWORD']:
@@ -37,6 +38,8 @@ if not app.debug:
         mail_handler.setLevel(logging.ERROR)
         app.logger.addHandler(mail_handler)
 
+# Use rotating file in production and development. It is especially useful in
+# an environment like Passenger which streams error log into Apache log
 file_handler = RotatingFileHandler('error_log', maxBytes=10240,
                                    backupCount=10)
 file_handler.setFormatter(logging.Formatter(
@@ -49,7 +52,3 @@ app.logger.info('EasyWP Cron Startup')
 
 
 from app import models, routes
-
-
-if __name__ == '__main__':
-    app.run()

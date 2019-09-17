@@ -2,3 +2,4 @@
 sftp-config.json
 .env
 .flaskenv
+__pycache__/*

@@ -7,17 +7,48 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 
 class Config(object):
+    """
+    Flask configuration class.
+
+    Variables:
+        SERVER_NAME {str} -- Domain name used by the application
+        SQLALCHEMY_DATABASE_URI {str} -- URI to make a database
+            connection through SQLAlchemy
+        SQLALCHEMY_TRACK_MODIFICATIONS {bool} -- Use SQLAlchemy events
+            system (models_commited & before_models_commited) if True
+        MAIL_SERVER {str} -- Outgoing mail server
+        MAIL_PORT {int} -- SMTP port
+        MAIL_USE_TLS {bool} -- Use secure TLS connection if True. SSL
+            is not supported.
+        MAIL_USERNAME {str} -- Username for the SMTP authentication
+        MAIL_PASSWORD {str} -- Password for the SMTP authentication
+        MAIL_DEFAULT_SENDER {str} -- Sender of emails. It is the same
+            as the SMTP username by default.
+        MAIL_DEFAULT_RECIPIENT {str} -- Default recipient of the system
+            emails.
+        CACHE_TYPE {str} -- Type of cache handler according to
+            Flask-Caching https://flask-caching.readthedocs.io/en/latest/#built-in-cache-backends
+        DEBUG {bool} -- Enable debug mode if True
+        FAILED_URL_HANDLER {str} -- Handler used to report failed
+            debugger removals. It can be set to "email", "bot", or "all".
+    """
     def get_database_uri():
+        """Transform MySQL login details into SQLAlchemy database URI.
+
+        Returns:
+            str -- SQLAlchemy database URI.
+        """
         MYSQL_SERVER = os.environ.get('MYSQL_SERVER')
         MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME')
         MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD')
         MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE')
-        if MYSQL_SERVER and MYSQL_USERNAME and MYSQL_PASSWORD and MYSQL_PASSWORD:
-            database_uri = 'mysql+pymysql://' + \
-                           MYSQL_USERNAME + ':' + \
-                           MYSQL_PASSWORD + '@' + \
-                           MYSQL_SERVER + '/' + \
-                           MYSQL_DATABASE
+        if MYSQL_SERVER and MYSQL_USERNAME and \
+                MYSQL_PASSWORD and MYSQL_DATABASE:
+            database_uri = 'mysql+pymysql://' \
+                           + MYSQL_USERNAME + ':' \
+                           + MYSQL_PASSWORD + '@' \
+                           + MYSQL_SERVER + '/' \
+                           + MYSQL_DATABASE
             return database_uri
         else:
             return ''

@@ -7,7 +7,7 @@ from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
 from app.functions import (add_job, catch_custom_exception, check_inputs,
                            delete_job, find_job, process_failed_inputs)
-from app.models import Failed_URL
+from app.models import FailedLink
 from flask import jsonify, request, url_for
 from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
@@ -74,16 +74,16 @@ def analyze():
         success, message = process_failed_inputs(validated_inputs)
 
     if not success:
-        url_without_query = response.url.split('?')[0]
+        link_without_query = response.url.split('?')[0]
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'email':
-            failed_link = Failed_URL(url=url_without_query, error=error, message=message)
+            failed_link = FailedLink(link=link_without_query, error=error, message=message)
             db.session.add(failed_link)
             db.session.commit()
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'bot':
             flock_message = "I failed to remove the following debugger file: " +\
-                      url_without_query + "<br/>" + message +\
+                      link_without_query + "<br/>" + message +\
                       "<br/>Please make sure the file is removed."
             FlockAPI.send_message(flock_message, color='#FF0000')
 
@@ -118,10 +118,15 @@ def delete(domain):
 @app.route('/report-failed-domains', methods=['GET'])
 @catch_custom_exception
 def report_failed_domains():
+    if app.config["FAILED_URL_HANDLER"] == 'bot':
+        return jsonify({
+            'success': False,
+            'message': 'Reporting of failed links via email is disabled'
+        })
     current_time = datetime.utcnow()
     one_day_ago = current_time - timedelta(days=1)
-    links_within_one_day = db.session.query(Failed_URL).filter(
-        Failed_URL.timestamp > one_day_ago).all()
+    links_within_one_day = db.session.query(FailedLink).filter(
+        FailedLink.timestamp > one_day_ago).all()
     if links_within_one_day:
         send_failed_links_email(links_within_one_day)
     return jsonify({'success': True})
@@ -132,8 +137,8 @@ def report_failed_domains():
 def delete_old_records():
     current_time = datetime.utcnow()
     one_month_ago = current_time - timedelta(days=30)
-    links_older_than_month = db.session.query(Failed_URL).filter(
-        Failed_URL.timestamp < one_month_ago).all()
+    links_older_than_month = db.session.query(FailedLink).filter(
+        FailedLink.timestamp < one_month_ago).all()
     for link in links_older_than_month:
         db.session.delete(link)
     db.session.commit()
