@@ -5,16 +5,28 @@ import requests
 from app import app, db
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
-from app.functions import (add_job, catch_custom_exception, check_inputs,
-                           delete_job, find_job, process_failed_inputs)
+from app.functions import (catch_custom_exception, check_inputs,
+                           process_failed_inputs)
+from app.job_manager import JobManager
 from app.models import FailedLink
-from flask import jsonify, request, url_for
+from flask import jsonify, request
 from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 
 @app.route('/create', methods=['POST'])
 @catch_custom_exception
 def create():
+    """Create a job to remove the debugger file in some time (2 hours
+        by default)
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Returns:
+        str -- JSON string containing the success of the job creation
+            and additional message.
+    """
     domain = request.form['domain']
     file = request.form['file']
     validated_inputs = check_inputs({'domain': domain, 'file': file})
@@ -22,8 +34,7 @@ def create():
         # If a job with this domain is not created yet, create a new one.
         # The new job will access domain.com?selfDesctruct in two hours
         # and will analyze output from it.
-        success, message = add_job(domain, file,
-                                   url_for('analyze', _external=True))
+        success, message = JobManager.add_job(domain, file)
     else:
         success, message = process_failed_inputs(validated_inputs)
 
@@ -36,6 +47,16 @@ def create():
 @app.route('/analyze', methods=['POST'])
 @catch_custom_exception
 def analyze():
+    """Try removing the debugger file and report the error if it occurs.
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Returns:
+        str -- JSON string containing the success of the file removal,
+            short description of the error and an additional message.
+    """
     domain = request.form['domain']
     file = request.form['file']
     validated_inputs = check_inputs({'domain': domain, 'file': file})
@@ -97,11 +118,24 @@ def analyze():
 @app.route('/delete/<domain>', methods=['DELETE'])
 @catch_custom_exception
 def delete(domain):
+    """Delete a job from the "atq" queue.
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Arguments:
+        domain {str} -- Domain from which the job creation request was sent.
+
+    Returns:
+        str -- JSON string containing the success of the job removal
+            and an additional message.
+    """
     validated_inputs = check_inputs({'domain': domain})
     if validated_inputs['domain']:
-        job_id = find_job(domain)
+        job_id = JobManager.find_job(domain)
         if job_id:
-            success, message = delete_job(job_id)
+            success, message = JobManager.delete_job(job_id)
         else:
             success = False
             message = "There is no such job."
@@ -115,9 +149,23 @@ def delete(domain):
     })
 
 
-@app.route('/report-failed-domains', methods=['GET'])
+@app.route('/report-failed-links', methods=['GET'])
 @catch_custom_exception
-def report_failed_domains():
+def report_failed_links():
+    """Report failed links via email.
+
+    Report failed links via email if the email FAILED_URL_HANDLER is
+    used. This endpoint is to set up in cron so that it reports the
+    failed links regularly.
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Returns:
+        str -- JSON string containing the success of the reporting and
+            an additional message.
+    """
     if app.config["FAILED_URL_HANDLER"] == 'bot':
         return jsonify({
             'success': False,
@@ -129,12 +177,24 @@ def report_failed_domains():
         FailedLink.timestamp > one_day_ago).all()
     if links_within_one_day:
         send_failed_links_email(links_within_one_day)
-    return jsonify({'success': True})
+    return jsonify({
+        'success': True,
+        'message': 'Failed links were sent in an email.'
+    })
 
 
 @app.route('/delete-old-records', methods=['DELETE'])
 @catch_custom_exception
 def delete_old_records():
+    """Delete database records older than month.
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Returns:
+        str -- JSON string containing the success of the deletion.
+    """
     current_time = datetime.utcnow()
     one_month_ago = current_time - timedelta(days=30)
     links_older_than_month = db.session.query(FailedLink).filter(
@@ -148,9 +208,14 @@ def delete_old_records():
 @app.route('/flock-bot', methods=['GET', 'POST'])
 @catch_custom_exception
 def flock_bot():
+    """Endpoint for Flock to communicate with the Flock bot.
+
+    Decorators:
+        app.route
+        catch_custom_exception
+
+    Returns:
+        str -- JSON string containing the response of FlockAPI (bot).
+    """
     json_request = request.get_json()
     return jsonify(FlockAPI.process(json_request))
-
-
-if __name__ == '__main__':
-    app.run()

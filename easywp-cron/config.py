@@ -31,6 +31,12 @@ class Config(object):
         DEBUG {bool} -- Enable debug mode if True
         FAILED_URL_HANDLER {str} -- Handler used to report failed
             debugger removals. It can be set to "email", "bot", or "all".
+        MAX_QUEUE_LENGTH {int} -- Maximum number of jobs in the queue.
+            If it is higher than the value, the app will return
+            "Resource is temporarily busy".
+        TIME_TO_DELETE {str} -- Time to wait before removing a debugger
+            file. This will be interpreted as "at now + <given_value>"
+            https://tecadmin.net/one-time-task-scheduling-using-at-commad-in-linux/
     """
     def get_database_uri():
         """Transform MySQL login details into SQLAlchemy database URI.
@@ -69,3 +75,5 @@ class Config(object):
     CACHE_TYPE = os.environ.get('CACHE_TYPE') or 'simple'
     DEBUG = (os.environ.get('DEBUG') == '1' or False)
     FAILED_URL_HANDLER = os.environ.get('FAILED_URL_HANDLER') or 'all'
+    MAX_QUEUE_LENGTH = int(os.environ.get('MAX_QUEUE_LENGTH') or 240)
+    TIME_TO_DELETE = os.environ.get('TIME_TO_DELETE') or '2 hours'
