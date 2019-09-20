@@ -53,7 +53,6 @@ class JobManager:
         Returns:
             mixed -- str if the job ID is returned; False on failure.
         """
-        app.logger.info('domain submitted to find_job: ' + domain)
         queue = JobManager.get_queue()
         if not queue:
             return False
