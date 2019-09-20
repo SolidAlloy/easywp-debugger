@@ -2770,7 +2770,7 @@ var sendFlushRequest = function(verbose) {
                 } else {
                     printMsg('Varnish Flush Failed!', true, 'warning-progress');
                 }
-                if (jsonData.errors.length !== 0) {
+                if (!jsonData.varnish_success && jsonData.errors.length !== 0) {
                     jsonData.errors.forEach(function(item, index, array) {
                         printMsg(item, true, 'danger-progress');
                     });
