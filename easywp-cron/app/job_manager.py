@@ -53,6 +53,7 @@ class JobManager:
         Returns:
             mixed -- str if the job ID is returned; False on failure.
         """
+        app.logger.info('domain submitted to find_job: ' + domain)
         queue = JobManager.get_queue()
         if not queue:
             return False
@@ -63,7 +64,7 @@ class JobManager:
             output = subprocess.run(['at', '-c', number],
                                     capture_output=True, text=True).stdout
             # Get content of each job until the domain is found
-            if output.find(domain):
+            if output.find(domain) != -1:
                 return number
         return False
 
