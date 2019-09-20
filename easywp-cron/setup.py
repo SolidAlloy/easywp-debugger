@@ -27,7 +27,7 @@ setup(
         'python-dotenv',
         'requests',
     ],
-    extras={
+    extras_require={
         'shell': ['ptpython'],
     },
 )
