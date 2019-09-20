@@ -17,17 +17,17 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
         'alembic',
-        'flask',
         'Flask-Caching',
         'Flask-Mail',
         'Flask-Migrate',
         'Flask-SQLAlchemy',
         'Flask-SSLify',
         'PyMySQL',
+        'flask',
         'python-dotenv',
         'requests',
     ],
-    extras_require={
-        'Shell': ['ptpython'],
+    extras={
+        'shell': ['ptpython'],
     },
 )

@@ -203,4 +203,7 @@ class FlockAPI:
             }
 
         elif json_request['name'] == 'chat.receiveMessage':
-            pass  # No need to implement for now.
+            app.logger.info('The message was received from '
+                            + json_request['message']['from']
+                            + '. The text is: '
+                            + json_request['message']['text'])
