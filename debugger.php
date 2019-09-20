@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.1');
+define('VERSION', '2.2');
 
 define('PASSWORD', 'notsoeasywp');
 
@@ -54,6 +54,9 @@ define('DS', DIRECTORY_SEPARATOR);
 // these two are required for the zip archivation to save the list of all directories and files inside a certain directory
 define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
+
+// send error reports regarding easywp-cron to
+define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com');
 
 
 /*
@@ -244,8 +247,8 @@ class Redis_Object_Cache
                     $predis = $plugin_dir . '/wp-nc-easywp/plugin/Http/Redis/includes/predis.php';
                     if (!file_exists($predis)) {
                         die(json_encode(array(
-                            'redis_success' => 0,
-                            'varnish_success' => 0,
+                            'redis_success' => false,
+                            'varnish_success' => false,
                             'errors' => array('Failed to find Redis. Are you using Debugger on EasyWP? Try fixing the EasyWP plugin.')
                         )));
                     }
@@ -368,7 +371,7 @@ class Redis_Object_Cache
 
     /**
      * Fetch the value of the key from Redis
-     * 
+     *
      * @param  string $key The key to search for
      * @return mixed       Value assigned to the key or false on failure
      */
@@ -379,6 +382,7 @@ class Redis_Object_Cache
 
     /**
      * Store the key and value for TTL seconds
+     *
      * @param  string  $key   Key to the value
      * @param  mixed   $value Value to store in the database
      * @param  integer $ttl   Time-to-live in seconds
@@ -391,12 +395,45 @@ class Redis_Object_Cache
 
     /**
      * Delete a key from cache
+     *
      * @param  string $key Key to delete
      * @return bool        True on success
      */
     public function delete($key)
     {
-        $this->redis->del($key);
+        return $this->redis->del($key);
+    }
+
+    /**
+     * Get TTL of a key
+     *
+     * @param  string $key Key of which to check TTL
+     * @return integer     TTL of the key, -1 if no TTL, -2 if no key
+     */
+    public function ttl($key)
+    {
+        return $this->redis->ttl($key);
+    }
+
+    /**
+     * Check if the key exists in cache
+     * @param  string $key Key to search for
+     * @return bool        true if the key exists
+     */
+    public function exists($key)
+    {
+        return $this->redis->exists($key);
+    }
+
+    /**
+     * Return keys matching the pattern, using '*' as a wildcard
+     *
+     * @param  string $pattern           String containing a pattern and wildcards
+     * @return array of strings          The keys that match a certain pattern
+     */
+    public function keys($pattern)
+    {
+        return $this->redis->keys($pattern);
     }
 }
 
@@ -407,14 +444,14 @@ class EasyWP_Cache
 {
     /**
      * Type of cache the class is managing at the moment
-     * 
+     *
      * @var string
      */
     protected $handler = '';
 
     /**
      * Redis class instance if redis handler is chosen
-     * 
+     *
      * @var object
      */
     protected $redis;
@@ -438,7 +475,7 @@ class EasyWP_Cache
 
     /**
      * Returns the current handler
-     * 
+     *
      * @return string Current cache handler. Either "apcu" or "redis"
      */
     public function getHandler()
@@ -448,7 +485,7 @@ class EasyWP_Cache
 
     /**
      * Fetches the value assigned to the key in the cache
-     * 
+     *
      * @param  mixed $key  Key to search for
      * @return mixed       Value assigned to the key
      */
@@ -463,7 +500,7 @@ class EasyWP_Cache
 
     /**
      * Saves a key-value sequence in the cache for TTL seconds
-     * 
+     *
      * @param  mixed   $key   Key to store in the cache
      * @param  mixed   $value Value to be assigned to the key
      * @param  integer $ttl   Number in seconds for which the key will be stored in the cache
@@ -480,7 +517,7 @@ class EasyWP_Cache
 
     /**
      * Deletes the key from cache
-     * 
+     *
      * @param  mixed $key Key to delete from cache
      * @return bool       Success of the deletion
      */
@@ -490,6 +527,109 @@ class EasyWP_Cache
             return apcu_delete($key);
         } else {
             return $this->redis->delete($key);
+        }
+    }
+
+    /**
+     * Gets an array of keys based on a pattern, using wildcards
+     *
+     * @param  string $pattern           String containing a pattern to search for
+     * @return array of strings          Keys matching the pattern
+     */
+    public function keys($pattern)
+    {
+        if ($this->handler == 'apcu') {
+            $pattern = '/'.str_replace('\*', '.*', preg_quote($pattern)).'/';  // transform wildcard pattern into a PCRE regex
+            $keysArray = [];
+            foreach (new APCUIterator($pattern) as $apcuCache) {
+                array_push($keysArray, $apcuCache['key']);
+            }
+            return $keysArray;
+        } else {
+            return $this->redis->keys($pattern);
+        }
+    }
+
+    /**
+     * Gets info about the keys that must not be removed during the flush() execution
+     *
+     * @return  array       Array with cache keys as keys and [value, ttl] as values
+     */
+    protected function getNeededKeys()
+    {
+        $keysDict = [];
+        $cronKey = 'cronCreateSent';
+        $loginKeys = $this->keys('*~login:*');
+        if ($this->exists($cronKey)) {
+            $keysDict[$cronKey] = [
+                $this->fetch($cronKey),
+                $this->ttl($cronKey),
+            ];
+        }
+        foreach ($loginKeys as $key) {
+            $keysDict[$key] = [
+                $this->fetch($key),
+                $this->ttl($key),
+            ];
+        }
+        return $keysDict;
+    }
+
+    /**
+     * Flushes apcu/redis cache except for specific keys
+     *
+     * @return bool     Success of the flush
+     */
+    public function flush()
+    {
+        // gather all keys that must not be removed in a dict with key, value, and ttl of each key
+        $keysDict = $this->getNeededKeys();
+
+        if ($this->handler == 'apcu') {
+            $result = apcu_clear_cache();
+        } else {
+            $result = $this->redis->flush();
+        }
+
+        foreach($keysDict as $key=>$info) {
+            $this->store($key, $info[0], $info[1]);  // set keys again after the flush
+        }
+
+        return $result;
+    }
+
+    /**
+     * Gets TTL of a key
+     *
+     * @param  string $key Key to check the TTL of
+     * @return integer     TTL  of the key, -2 if key doesn't exist
+     */
+    public function ttl($key)
+    {
+        if ($this->handler == 'apcu') {
+            $keyInfo = apcu_key_info($key);
+            if ($keyInfo) {
+                return $keyInfo['creation_time'] + $keyInfo['ttl'] - time();
+            } else {
+                return -2;
+            }
+        } else {
+            return $this->redis->ttl($key);
+        }
+    }
+
+    /**
+     * Checks if the key exists
+     *
+     * @param  string $key Key to search for
+     * @return bool        True if the key exists
+     */
+    public function exists($key)
+    {
+        if ($this->handler == 'apcu') {
+            return apcu_exists($key);
+        } else {
+            return $this->redis->exists($key);
         }
     }
 }
@@ -672,7 +812,7 @@ class VarnishCache
     private $dbConn;  // DBdata class instance
     public $errors = array();
     private $tried_localhost = false;
-    
+
     public function __construct ()
     {
         $this->dbConn = new DBconn;
@@ -745,24 +885,24 @@ class VarnishCache
             if (!$schema) {
                 $schema = $dbData['schema'] ?: 'http://';
             }
-        
+
             // get default purge method
             $x_purge_method = $dbData['x_purge_method'] ?: 'default';
-        
+
             // default regexp
             $regex = '';
-        
+
             if (isset($parsedUrl['query']) && ($parsedUrl['query'] == 'vhp-regex')) {
                 $regex          = '.*';
                 $x_purge_method = 'regex';
             }
-        
+
             // varnish ip
             $varnishIp = $dbData['varnishIp'] ?: '127.0.0.1';
-        
+
             // path
             $path = $parsedUrl['path']??'';
-        
+
             // setting host
             $hostHeader = $parsedUrl['host'];
             $podname    = getenv('HOSTNAME');
@@ -770,19 +910,19 @@ class VarnishCache
             if (empty($podname)) {
                 $host = $varnishIp??$hostHeader;
             }
-        
+
             if (isset($parsedUrl['port'])) {
                 $hostHeader = "{$host}:{$parsedUrl[ 'port' ]}";
             }
-        
+
             $headers = [
                 'host' => $hostHeader,
                 'X-Purge-Method' => $x_purge_method,
             ];
-        
+
             // final url
             $urlToPurge = "{$schema}{$host}{$path}{$regex}";
-            
+
             // send PURGE request and check the response
             $ch = curl_init();
             $timeout = 10;
@@ -792,7 +932,7 @@ class VarnishCache
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PURGE");
             $data = curl_exec($ch);
-        
+
             if(curl_errno($ch)) {
                 // sometimes, https scheme in the database is incorrect and purge fails because of it
                 if (strpos(curl_error($ch), 'port 443: Connection refused')) {
@@ -827,7 +967,7 @@ class VarnishCache
     }
 
     /**
-     * [clearAll Purges all Varnish caches of the website and returns an array 
+     * [clearAll Purges all Varnish caches of the website and returns an array
      * of true/false for each Varnish URL]
      * @return null
      */
@@ -971,6 +1111,166 @@ class DirZipArchive
     }
 }
 
+/**
+ * CronAPI allows to communicate with EasyWP Cron through REST API easily
+ */
+class CronAPI
+{
+    /**
+     * Time to wait for the response
+     * @var integer
+     */
+    protected $timeout = 30;
+
+    /**
+     * Domain to which debugger was uploaded
+     * @var string
+     */
+    protected $domain;
+
+    /**
+     * Name of the debugger file (wp-admin-debugger.php or debugger.php by default)
+     * @var string
+     */
+    protected $file;
+
+    public function __construct()
+    {
+        $this->domain = $_SERVER['HTTP_HOST'];
+        $this->file = basename(__FILE__);
+    }
+
+    /**
+     * Sends an email from the default server mailbox to a recipient defined at the start of the file
+     *
+     * @param  string $emailBody Body of the email
+     * @param  string $endpoint  Endpoint of the easywp-cron API
+     * @return null
+     */
+    protected function sendMail($emailBody, $endpoint)
+    {
+        $subject = 'Debugger: error accessing endpoint /'.$endpoint;
+        $emailBody = "Reporter: ".$this->domain.'/'.$this->file."\n".$emailBody;
+        $headers = "X-Mailer: PHP/".phpversion();
+        mail(MAIL_RECIPIENT, $subject, $emailBody, $headers);
+    }
+
+    /**
+     * Sends a request to the API endpoint and returns output or false on fail
+     *
+     * @param  string $endpoint Endpoint of the API
+     * @param  string $method   HTTP method to use
+     * @param  array  $data     Data to be sent in a POST request
+     * @return mixed            string of output on success or false on fail
+     */
+    protected function sendRequest($endpoint, $method, $data=null)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
+        if (strcasecmp($method, 'POST') == 0) {
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        } elseif (strcasecmp($method, 'DELETE') == 0) {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+        }
+
+        $result = curl_exec($ch);
+
+        if(curl_errno($ch)) {
+            $emailBody .= "Curl Error when trying to access /".$endpoint."\n";
+            $emailBody .= "Error: ".curl_error($ch)."\n";
+            $this->sendMail($emailBody, $endpoint);
+            curl_close($ch);
+            return false;
+        }
+
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($httpCode == 200) {
+            curl_close($ch);
+            return $result;
+        } else {
+            $emailBody .= "Invalid status code when trying to access /".$endpoint."\n";
+            $emailBody .= "Status Code: ".$httpCode."\n";
+            $this->sendMail($emailBody, $endpoint);
+            curl_close($ch);
+            return false;
+        }
+    }
+
+    /**
+     * Analyzes if the request failed and sends corresponding emails
+     *
+     * @param  string   $output   String of output or false
+     * @param  string   $endpoint Endpoint of the API
+     * @return boolean            Success of the request
+     */
+    protected function analyzeRequest($output, $endpoint)
+    {
+        $result = false;
+        if ($output) {
+            $jsonData = json_decode($output);
+            if ($jsonData) {
+                if ($jsonData->success) {
+                    $result = true;
+                } else {
+                    $emailBody  = "Request to /".$endpoint." failed.\n";
+                    $emailBody .= "Reason: ".$jsonData->message."\n";
+                }
+            } else {
+                $emailBody  = "The output returned from /".$endpoint." is not JSON.\n";
+                $emailBody .= "Output: ".$output."\n";
+            }
+        } elseif ($output !== false) {  // if output is empty but not false
+            $emailBody .= "Status code was 200 but no output was returned when trying to access /".$endpoint."\n";
+        } else {  // if output is false, the corresponding email was sent by sendRequest, so no need to send another one
+            return false;
+        }
+        if ($result) {
+            return true;
+        } else {
+            $this->sendMail($emailBody, $endpoint);
+            return false;
+        }
+    }
+
+    /**
+     * Creates a cron that will delete debugger in 2 hours
+     *
+     * @return boolean Success of the cron creation
+     */
+    public function createCron()
+    {
+        $endpoint = 'create';
+        $data  = 'domain='.$this->domain;
+        $data .= '&file='.$this->file;
+        $output = $this->sendRequest($endpoint, 'POST', $data);
+        if ($this->analyzeRequest($output, $endpoint)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Deletes the cron, so it will not be executed
+     *
+     * @return boolean Success of the deletion
+     */
+    public function deleteCron()
+    {
+        $endpoint = 'delete/'.$this->domain;
+        $output = $this->sendRequest($endpoint, 'DELETE');
+        if ($this->analyzeRequest($output, $endpoint)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
 
 /*
     !!! PHP functions section !!!
@@ -1007,8 +1307,8 @@ function flushOPcache()
 
 function flushRedis()
 {
-    $redis_object_cache = new Redis_Object_Cache();
-    return $redis_object_cache->flush();
+    $cache = new EasyWP_Cache();
+    return $cache->flush();
 }
 
 /**
@@ -1350,7 +1650,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 {
     $time_start = time();
     $archive = zip_open($archiveName);
-    
+
     if (gettype($archive) == 'integer') {  // if error upon opening the archive ...
         $error = ERRORS[$archive];
         throw new Exception($error); // throw it within an exception
@@ -1358,7 +1658,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 
     $counter = 0;
     while($entry = zip_read($archive)){
-        
+
         if ($startNum > ++$counter) {  // skip files before startNum
             continue;
         }
@@ -1480,18 +1780,18 @@ function unzipArchivePost($archiveName)
     try {
         $result = unzipArchive($archiveName, $_POST['destDir'], $startNum, $_POST['maxUnzipTime']);  // try extracting archive
         if ($result === true) {
-            die(json_encode(array('success' => 1,
+            die(json_encode(array('success' => true,
                                   'error' => '',
                                   'startNum' => 0,
                                   'failedFile' => '')));
         } else {
-            die(json_encode(array('success' => 0,
+            die(json_encode(array('success' => false,
                                   'error' => '',
                                   'startNum' => $result[0],
                                   'failedFile' => $result[1])));
         }
     } catch (Exception $e) {
-        die(json_encode(array('success' => 0,
+        die(json_encode(array('success' => true,
                               'error' => $e->getMessage(),
                               'startNum' => 0,
                               'failedFile' => '')));
@@ -1508,11 +1808,11 @@ function viewArchivePost($archiveName)
     try {
         $files = viewArchive($archiveName);
     } catch (Exception $e) {
-        die(json_encode(array('success' => 0,
+        die(json_encode(array('success' => false,
                               'files' => [],
                               'error' => $e->getMessage())));
     }
-    die(json_encode(array('success' => 1,
+    die(json_encode(array('success' => true,
                           'files' => $files,
                           'error' => '')));
 }
@@ -1579,7 +1879,7 @@ function processArchiveRequest()
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of complete fail
         unlink(FILES);
-        return json_encode(array('success' => 0,
+        return json_encode(array('success' => false,
                                  'error' => $e->getMessage(),
                                  'startNum' => 0,
                                 ));
@@ -1598,7 +1898,7 @@ function processArchiveRequest()
                                  'startNum' => 0,
                                 ));
     } else {
-        return json_encode(array('success' => 0,
+        return json_encode(array('success' => false,
                                  'error' => '',
                                  'startNum' => $result,  // return the number of file on which the compression stopped
                                 ));
@@ -1719,7 +2019,7 @@ function installPlugin($url)
 
 /**
  * Activates a WordPress plugin
- * 
+ *
  * @param  string $pluginPath Path-to-plugin-folder/path-to-plugin-main-file
  * @return bool               Success of the activation
  */
@@ -1735,8 +2035,8 @@ function activatePlugin($pluginPath)
 
 /**
  * Deactivates a WordPress plugin
- * 
- * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file 
+ *
+ * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file
  * @return bool                Success of the deactivation
  */
 function deactivatePlugin($pluginPath)
@@ -1774,7 +2074,17 @@ function login($password)
     try {
         $cache = new EasyWP_Cache();
     } catch (Exception $e) {
+        $cronAPI = new CronAPI();  // since cache isn't supported here, send createCron request before checking in cache if it was already sent
+        $cronAPI->createCron();
         throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
+    }
+
+    $cronKey = 'cronCreateSent';
+    $cronCreateSent = $cache->fetch($cronKey);
+    if (!$cronCreateSent) {  // send the cron if it wasn't sent before
+        $cronAPI = new CronAPI();
+        $cronAPI->createCron();
+        $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
     }
 
     if ($cache->getHandler() == 'redis') {
@@ -1802,10 +2112,124 @@ function login($password)
     }
 }
 
+/**
+ * Deletes the easywp cron and removes its reference from the cache
+ * @return null
+ */
+function deleteCronAndCache()
+{
+    $cronAPI = new CronAPI();
+    $cronAPI->deleteCron();
+
+    try {
+        $cache = new EasyWP_Cache();
+        $cache->delete('cronCreateSent');
+    } catch (Exception $e) {
+        // do nothing
+    }
+}
+
+/**
+ * Installs and activates the UsageDD plugin
+ *
+ * @return array        Success of enabling and error if there was one
+ */
+function usageEnable()
+{
+    $wpLoginUrl = getWpLoginUrl();
+    if (websiteIsUp($wpLoginUrl)) {
+        require_once('wp-blog-header.php');
+        require_once('wp-admin/includes/file.php');
+        require_once('wp-admin/includes/plugin.php');
+        if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
+            if (activatePlugin('usagedd/usagedd.php')) {
+                $success = true;
+                $error = '';
+            } else {
+                $success = false;
+                $error = 'pluginActivation';
+            }
+        } else {
+            $success = false;
+            $error = 'pluginInstallation';
+        }
+    } else {
+        $success = false;
+        $error = 'websiteDown';
+    }
+    http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+
+    return [
+        'success' => $success,
+        'error' => $error,
+    ];
+}
+
+/**
+ * Disables and removes the UsageDD plugin
+ *
+ * @return array       Success of enabling and error if there was one
+ */
+function usageDisable()
+{
+    $wpLoginUrl = getWpLoginUrl();
+    if (websiteIsUp($wpLoginUrl)) {
+        require_once('wp-blog-header.php');
+        require_once('wp-admin/includes/file.php');
+        require_once('wp-admin/includes/plugin.php');
+        if (deactivatePlugin('usagedd/usagedd.php')) {
+            if (DeletePlugin('usagedd')) {
+                $success = true;
+                $error = '';
+            } else {
+                $success = false;
+                $error = 'pluginDeletion';
+            }
+        } else {
+            $success == false;
+            $error = 'pluginDeactivation';
+        }
+    } else {
+        $success = false;
+        $error = 'websiteDown';
+    }
+
+    http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
+
+    return [
+        'success' => $success,
+        'error' => $error,
+    ];
+}
+
+/**
+ * Removes all the additional files and itself
+ *
+ * @return null
+ */
+function selfDestruct()
+{
+    session_destroy();
+    deleteCronAndCache();
+    $files = array('wp-admin/adminer-auto.php',
+                   'wp-admin/adminer.php',
+                   'wp-admin/adminer.css',
+                    __FILE__);
+    foreach($files as $file) {
+        unlink($file);
+    }
+
+    // disable debug, remove UsageDD, and clear cache silently because if it fails, nothing else can be done anyway
+    wpConfigClear();
+    usageDisable();
+    clearAll();
+}
+
 
 /*
-    !!! POST request processors section !!! 
+    !!! POST request processors section !!!
 */
+
 
 
 /* creates session and print success if the password matches */
@@ -1826,6 +2250,12 @@ if (isset($_POST['login'])) {
     )));
 }
 
+/* removes debugger.php and additional files from the server, disables debug. Doesn't require login */
+if (isset($_POST['selfDestruct']) || isset($_GET['selfDestruct'])) {
+    selfDestruct();
+    die(json_encode(array('success' => true)));
+}
+
 // if the Debugger session is created, process POST requests
 if (authorized()) {
 
@@ -1838,19 +2268,19 @@ if (authorized()) {
 
     /* enables errors on-screen */
     if (isset($_POST['debugOn'])) {
-        $debug_result = wpConfigPut() ? 1 : 0;
+        $debug_result = wpConfigPut();
         die(json_encode(array('debug_on_success' => $debug_result)));
     }
 
     /* disables on-screen errors */
     if (isset($_POST['debugOff'])) {
-        $debug_result = wpConfigClear() ? 1 : 0;
+        $debug_result = wpConfigClear();
         die(json_encode(array('debug_off_success' => $debug_result)));
     }
 
     /* replaces WordPress default files (latest version of WordPress) */
     if (isset($_POST['replace'])) {
-        $result = replaceDefaultFiles() ? 1 : 0;
+        $result = replaceDefaultFiles();
         echo json_encode(array('replace_success' => $result));
         exit;
     }
@@ -1885,33 +2315,16 @@ if (authorized()) {
 
     /* fixes the EasyWP plugin if its files are not fully present on the website */
     if (isset($_POST['fixPlugin'])) {
-        $symLink = createEasyWpSymLink() ? 1 : 0;
-        $objectCache = createObjectCache() ? 1 : 0;
+        $symLink = createEasyWpSymLink();
+        $objectCache = createObjectCache();
         echo json_encode(array('symLink' => $symLink, 'objectCache' => $objectCache));
         exit();
-    }
-
-    /* removes debugger.php and additional files from the server, disables debug */
-    if (isset($_POST['selfDestruct'])) {
-        session_destroy();
-        $files = array('wp-admin/adminer-auto.php',
-                       'wp-admin/adminer.php',
-                       'wp-admin/adminer.css',
-                        __FILE__);
-        foreach($files as $file) {
-            unlink($file);
-        }
-
-        wpConfigClear();  // disable debug and clear cache silently because if it fails, nothing else can be done anyway
-        clearAll();
-
-        die(json_encode(array('success' => 1)));
     }
 
     /* fix filesystem not being able to find some files by running stat() on all files */
     if (isset($_POST['fixFileSystem'])) {
         statAllFiles('/var/www/wptbox');
-        echo json_encode(array('success' => 1));
+        echo json_encode(array('success' => true));
         exit();
     }
 
@@ -1923,9 +2336,9 @@ if (authorized()) {
                                         );
         if (uploadFiles($adminerFilesAndSources)) {
             $_SESSION['debugger_adminer'] = true;
-            die(json_encode(array('success' => 1)));
+            die(json_encode(array('success' => true)));
         } else {
-            die(json_encode(array('success' => 0)));
+            die(json_encode(array('success' => false)));
         }
     }
 
@@ -1935,7 +2348,7 @@ if (authorized()) {
         unlink('wp-admin/adminer.php');
         unlink('wp-admin/adminer.css');
         unset($_SESSION['debugger_adminer']);
-        die(json_encode(array('success' => 1)));
+        die(json_encode(array('success' => true)));
     }
 
     /* prints success=true if the destination directory of extraction exists or has been successfully created */
@@ -1951,7 +2364,7 @@ if (authorized()) {
     /* if something needs to be done with an archive */
     if (isset($_POST['archiveName']) && isset($_POST['action'])) {
         $archiveName = $_POST['archiveName'];
-        
+
         if ($_POST['action'] == 'extract') {  // extract archive
             unzipArchivePost($archiveName);
         } elseif ($_POST['action'] == 'view') {  // show content of archive
@@ -1964,11 +2377,11 @@ if (authorized()) {
         try {
             $number = countFiles($_POST['filesNumber']);
         } catch (Exception $e) {
-            die(json_encode(array('success' => 0,
+            die(json_encode(array('success' => true,
                                   'number' => 0,
                                   'error' => $e->getMessage())));
         }
-        die(json_encode(array('success' => 1,
+        die(json_encode(array('success' => true,
                               'number' => $number,
                               'error' => '')));
     }
@@ -2024,7 +2437,7 @@ if (authorized()) {
             $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
                                               );
             if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
-                $success = true;  
+                $success = true;
                 $file = true;
             } else {
                 $success = false;
@@ -2052,7 +2465,7 @@ if (authorized()) {
     }
 
     /* deletes a file or folder from the hosting storage */
-    if (isset($_POST['delete'])) {
+    if (isset($_POST['deleteEntry'])) {
         $entry = $_POST['entry'];
         if (!file_exists($entry)) {  // if entry does not exist
             die(json_encode(array('success' => false ,
@@ -2094,68 +2507,19 @@ if (authorized()) {
 
     /* installs and activates the UsageDD plugin */
     if (isset($_POST['usageEnable'])) {
-        $wpLoginUrl = getWpLoginUrl();
-        if (websiteIsUp($wpLoginUrl)) {
-            require_once('wp-blog-header.php');
-            require_once('wp-admin/includes/file.php');
-            require_once('wp-admin/includes/plugin.php');
-            if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
-                if (activatePlugin('usagedd/usagedd.php')) {
-                    $success = true;
-                    $error = '';
-                } else {
-                    $success = false;
-                    $error = 'pluginActivation';
-                }
-            } else {
-                $success = false;
-                $error = 'pluginInstallation';
-            }
-        } else {
-            $success = false;
-            $error = 'websiteDown';
-        }
-        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
-        die(json_encode(array(
-                            'success' => $success,
-                            'error'   => $error,
-        )));
+        $result = usageEnable();
+        die(json_encode($result));
     }
 
     /* deactivates and removes the UsageDD plugin */
     if (isset($_POST['usageDisable'])) {
-        $wpLoginUrl = getWpLoginUrl();
-        if (websiteIsUp($wpLoginUrl)) {
-            require_once('wp-blog-header.php');
-            require_once('wp-admin/includes/file.php');
-            require_once('wp-admin/includes/plugin.php');
-            if (deactivatePlugin('usagedd/usagedd.php')) {
-                if (DeletePlugin('usagedd')) {
-                    $success = true;
-                    $error = '';
-                } else {
-                    $success = false;
-                    $error = 'pluginDeletion';
-                }
-            } else {
-                $success == false;
-                $error = 'pluginDeactivation';
-            }
-        } else {
-            $success = false;
-            $error = 'websiteDown';
-        }
-        http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
-        die(json_encode(array(
-                            'success' => $success,
-                            'error'   => $error,
-        )));
+        $result = usageDisable();
+        die(json_encode($result));
     }
-
 }  // end of "if( authorized() )"
 
 ?>
- 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2196,7 +2560,7 @@ var printMsg = function(msg, scroll, color, small) {
     }
 
     $('#progress-log').append(liString);
-    
+
     if (!small) {
         // make the text block higher if the text is wrapped to multiple lines
         lastLi = $('#progress-log > li').last();
@@ -2550,17 +2914,17 @@ var sendActivateRequest = function($button) {
                 return;
             }
             handleEmptyResponse($button, jsonData, failText);
-            if (jsonData.replace == "1" && jsonData.activate == "1") {
+            if (jsonData.replace && jsonData.activate) {
                 $button.html(doneText);
             } else {
                 $button.html(failText);
             }
-            if (jsonData.replace == "1") {
+            if (jsonData.replace) {
                 printMsg('Theme Uploaded Successfully!', false, 'success-progress');
             } else {
                 printMsg('Theme Upload Failed!', false, 'warning-progress');
             }
-            if (jsonData.activate == "1") {
+            if (jsonData.activate) {
                 printMsg('Theme Activated Successfully!', true, 'success-progress');
             } else {
                 printMsg('Theme Activation Failed!', true, 'warning-progress');
@@ -2772,15 +3136,15 @@ var sendAutoLoginRequest = function() {
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (jsonData.file === false) {  // it can also be true and null
-                    printMsg('Failed to upload wp-admin-auto.php.', true, 'warning-progress'); 
-                }   
-                if (!jsonData.siteurl) {    
-                    printMsg('Failed to find siteurl', true, 'warning-progress');   
-                }   
-                if (jsonData.errors.length !== 0) { 
-                    jsonData.errors.forEach(function(item, index, array) {  
-                        printMsg(item, true, 'danger-progress');   
-                    }); 
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'warning-progress');
+                }
+                if (!jsonData.siteurl) {
+                    printMsg('Failed to find siteurl', true, 'warning-progress');
+                }
+                if (jsonData.errors.length !== 0) {
+                    jsonData.errors.forEach(function(item, index, array) {
+                        printMsg(item, true, 'danger-progress');
+                    });
                 }
             }
         },
@@ -2807,7 +3171,7 @@ var sendSelfDestructRequest = function() {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
-            handleEmptyResponse($("#btnSelfDestruct"), jsonData);
+            handleEmptyResponse($(".btnSelfDestruct"), jsonData);
             if (jsonData.success) {
                 printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
             }
@@ -2851,7 +3215,7 @@ var sendSubResourcesRequest = function() {
 
 /**
  * Sends a request to upload and activate the UsageDD plugin
- * 
+ *
  * @return {null}
  */
 var sendUsageEnableRequest = function() {
@@ -2887,7 +3251,7 @@ var sendUsageEnableRequest = function() {
 
 /**
  * Sends a request to deactivate and remove the UsageDD plugin
- * 
+ *
  * @return {null}
  */
 var sendUsageDisableRequest = function() {
@@ -3237,9 +3601,9 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
-            
+
             handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
-                
+
             if (jsonData.success) {  // if success, show the success button and message
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnArchive').prop("disabled", false);
@@ -3311,9 +3675,9 @@ var processArchiveForm = function(form) {
             printMsg('The returned value is not JSON', true, 'danger-progress');
             return;
         }
-        
+
         handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
-            
+
         if (jsonData.numberSuccess && jsonData.checkArchiveSuccess) {
             $("#progress-row").removeClass('d-none').addClass('show');
             $("#progress-container").html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
@@ -3348,7 +3712,7 @@ var processDeleteForm = function(form) {
     // send request to get filenames inside zip file
     $.ajax({
         type: "POST",
-        data: {delete: 'submit',
+        data: {deleteEntry: 'submit',
                entry: entry},
         success: function(response) {  // on success
             var jsonData;
@@ -3458,7 +3822,7 @@ $(document).ready(function() {
 
     $('#delete-form').submit(function(form) {
         processDeleteForm(form);
-    });    
+    });
 
     $("#btnFlush").click(function() {
         sendFlushRequest(true);  // verbose turned on
@@ -3496,11 +3860,11 @@ $(document).ready(function() {
         sendFixPluginRequest();
     });
 
-    $("#btnAutoLogin").click(function() {
+    $(".btnAutoLogin").click(function() {
         sendAutoLoginRequest();
     });
 
-    $("#btnSelfDestruct").click(function() {
+    $(".btnSelfDestruct").click(function() {
         sendSelfDestructRequest();
     });
 
@@ -3537,7 +3901,7 @@ var processLoginform = function(form) {
         timeout: 40000,
         success: function(response) {
             var jsonData = JSON.parse(response);
-            
+
             handleEmptyResponse($(''), jsonData);
 
             if (jsonData.success) {
@@ -3563,7 +3927,7 @@ $(document).ready(function() {
 </script>
 <?php endif; ?>
 
-    
+
 
 <!-- *                                      -->
 <!-- *    !!! CSS section !!!               -->
@@ -3696,7 +4060,7 @@ $(document).ready(function() {
             border-top-left-radius: 0;
             border-top-right-radius: 0;
         }
-        
+
         /* default color of all menu items */
         .navbar-dark .navbar-brand, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
             color: var(--nav-light);
@@ -3711,7 +4075,7 @@ $(document).ready(function() {
         .navbar.navbar-dark .navbar-nav .nav-item.active>span>.nav-link:hover {
             color: var(--nav-dark);
         }
-        
+
         /* switch to darker color on hover for all other (inactive) menu items */
         .navbar.navbar-dark .navbar-nav .nav-item>span>.nav-link:hover {
             color: var(--nav-dark);
@@ -3721,7 +4085,7 @@ $(document).ready(function() {
         #easywp-tab:hover .icon-easywp {
             fill: var(--nav-dark);
         }
-        
+
         /* override animation (default color is white for MDBootstrap). The second selector is the easywp icon that doesn't get animated along with the text */
         .navbar.navbar-dark .navbar-nav .nav-item .nav-link, #easywp-tab .icon-easywp {
             transition-property: all;
@@ -3742,8 +4106,8 @@ $(document).ready(function() {
     }
 
     /**
-     * Style for the svg icon which is the only one different from the other icons 
-     * the were downloaded from awesomefont. These style block makes it similar to 
+     * Style for the svg icon which is the only one different from the other icons
+     * the were downloaded from awesomefont. These style block makes it similar to
      * the awesomefont icons.
      */
     .icon-easywp {
@@ -4029,7 +4393,7 @@ $(document).ready(function() {
             </ul>
         </div>
         <div class="col my-auto">
-            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3 btnSelfDestruct" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
             <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
         </div>
     </div>
@@ -4070,8 +4434,8 @@ $(document).ready(function() {
                 <li>
                     <div class="row">
                         <div class="col">
-                            <button type="button" class="btn btn-nav unique-color float-left mr-5" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
-                            <button type="button" class="btn btn-nav btn-red float-left" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+                            <button type="button" class="btn btn-nav unique-color float-left mr-5 btnAutoLogin" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+                            <button type="button" class="btn btn-nav btn-red float-left btnSelfDestruct" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
                         </div>
                     </div>
                 </li>
