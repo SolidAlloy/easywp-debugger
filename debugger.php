@@ -371,7 +371,7 @@ class Redis_Object_Cache
 
     /**
      * Fetch the value of the key from Redis
-     * 
+     *
      * @param  string $key The key to search for
      * @return mixed       Value assigned to the key or false on failure
      */
@@ -382,7 +382,7 @@ class Redis_Object_Cache
 
     /**
      * Store the key and value for TTL seconds
-     * 
+     *
      * @param  string  $key   Key to the value
      * @param  mixed   $value Value to store in the database
      * @param  integer $ttl   Time-to-live in seconds
@@ -395,7 +395,7 @@ class Redis_Object_Cache
 
     /**
      * Delete a key from cache
-     * 
+     *
      * @param  string $key Key to delete
      * @return bool        True on success
      */
@@ -406,7 +406,7 @@ class Redis_Object_Cache
 
     /**
      * Get TTL of a key
-     * 
+     *
      * @param  string $key Key of which to check TTL
      * @return integer     TTL of the key, -1 if no TTL, -2 if no key
      */
@@ -427,7 +427,7 @@ class Redis_Object_Cache
 
     /**
      * Return keys matching the pattern, using '*' as a wildcard
-     * 
+     *
      * @param  string $pattern           String containing a pattern and wildcards
      * @return array of strings          The keys that match a certain pattern
      */
@@ -444,14 +444,14 @@ class EasyWP_Cache
 {
     /**
      * Type of cache the class is managing at the moment
-     * 
+     *
      * @var string
      */
     protected $handler = '';
 
     /**
      * Redis class instance if redis handler is chosen
-     * 
+     *
      * @var object
      */
     protected $redis;
@@ -475,7 +475,7 @@ class EasyWP_Cache
 
     /**
      * Returns the current handler
-     * 
+     *
      * @return string Current cache handler. Either "apcu" or "redis"
      */
     public function getHandler()
@@ -485,7 +485,7 @@ class EasyWP_Cache
 
     /**
      * Fetches the value assigned to the key in the cache
-     * 
+     *
      * @param  mixed $key  Key to search for
      * @return mixed       Value assigned to the key
      */
@@ -500,7 +500,7 @@ class EasyWP_Cache
 
     /**
      * Saves a key-value sequence in the cache for TTL seconds
-     * 
+     *
      * @param  mixed   $key   Key to store in the cache
      * @param  mixed   $value Value to be assigned to the key
      * @param  integer $ttl   Number in seconds for which the key will be stored in the cache
@@ -517,7 +517,7 @@ class EasyWP_Cache
 
     /**
      * Deletes the key from cache
-     * 
+     *
      * @param  mixed $key Key to delete from cache
      * @return bool       Success of the deletion
      */
@@ -532,7 +532,7 @@ class EasyWP_Cache
 
     /**
      * Gets an array of keys based on a pattern, using wildcards
-     * 
+     *
      * @param  string $pattern           String containing a pattern to search for
      * @return array of strings          Keys matching the pattern
      */
@@ -552,7 +552,7 @@ class EasyWP_Cache
 
     /**
      * Gets info about the keys that must not be removed during the flush() execution
-     * 
+     *
      * @return  array       Array with cache keys as keys and [value, ttl] as values
      */
     protected function getNeededKeys()
@@ -577,7 +577,7 @@ class EasyWP_Cache
 
     /**
      * Flushes apcu/redis cache except for specific keys
-     * 
+     *
      * @return bool     Success of the flush
      */
     public function flush()
@@ -600,7 +600,7 @@ class EasyWP_Cache
 
     /**
      * Gets TTL of a key
-     * 
+     *
      * @param  string $key Key to check the TTL of
      * @return integer     TTL  of the key, -2 if key doesn't exist
      */
@@ -620,7 +620,7 @@ class EasyWP_Cache
 
     /**
      * Checks if the key exists
-     * 
+     *
      * @param  string $key Key to search for
      * @return bool        True if the key exists
      */
@@ -812,7 +812,7 @@ class VarnishCache
     private $dbConn;  // DBdata class instance
     public $errors = array();
     private $tried_localhost = false;
-    
+
     public function __construct ()
     {
         $this->dbConn = new DBconn;
@@ -885,24 +885,24 @@ class VarnishCache
             if (!$schema) {
                 $schema = $dbData['schema'] ?: 'http://';
             }
-        
+
             // get default purge method
             $x_purge_method = $dbData['x_purge_method'] ?: 'default';
-        
+
             // default regexp
             $regex = '';
-        
+
             if (isset($parsedUrl['query']) && ($parsedUrl['query'] == 'vhp-regex')) {
                 $regex          = '.*';
                 $x_purge_method = 'regex';
             }
-        
+
             // varnish ip
             $varnishIp = $dbData['varnishIp'] ?: '127.0.0.1';
-        
+
             // path
             $path = $parsedUrl['path']??'';
-        
+
             // setting host
             $hostHeader = $parsedUrl['host'];
             $podname    = getenv('HOSTNAME');
@@ -910,19 +910,19 @@ class VarnishCache
             if (empty($podname)) {
                 $host = $varnishIp??$hostHeader;
             }
-        
+
             if (isset($parsedUrl['port'])) {
                 $hostHeader = "{$host}:{$parsedUrl[ 'port' ]}";
             }
-        
+
             $headers = [
                 'host' => $hostHeader,
                 'X-Purge-Method' => $x_purge_method,
             ];
-        
+
             // final url
             $urlToPurge = "{$schema}{$host}{$path}{$regex}";
-            
+
             // send PURGE request and check the response
             $ch = curl_init();
             $timeout = 10;
@@ -932,7 +932,7 @@ class VarnishCache
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PURGE");
             $data = curl_exec($ch);
-        
+
             if(curl_errno($ch)) {
                 // sometimes, https scheme in the database is incorrect and purge fails because of it
                 if (strpos(curl_error($ch), 'port 443: Connection refused')) {
@@ -967,7 +967,7 @@ class VarnishCache
     }
 
     /**
-     * [clearAll Purges all Varnish caches of the website and returns an array 
+     * [clearAll Purges all Varnish caches of the website and returns an array
      * of true/false for each Varnish URL]
      * @return null
      */
@@ -1132,16 +1132,17 @@ class CronAPI
      * Name of the debugger file (wp-admin-debugger.php or debugger.php by default)
      * @var string
      */
-    protected $file = __FILE__;
+    protected $file;
 
     public function __construct()
     {
         $this->domain = $_SERVER['HTTP_HOST'];
+        $this->file = basename(__FILE__);
     }
 
     /**
      * Sends an email from the default server mailbox to a recipient defined at the start of the file
-     * 
+     *
      * @param  string $emailBody Body of the email
      * @param  string $endpoint  Endpoint of the easywp-cron API
      * @return null
@@ -1156,7 +1157,7 @@ class CronAPI
 
     /**
      * Sends a request to the API endpoint and returns output or false on fail
-     * 
+     *
      * @param  string $endpoint Endpoint of the API
      * @param  string $method   HTTP method to use
      * @param  array  $data     Data to be sent in a POST request
@@ -1166,11 +1167,12 @@ class CronAPI
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
         if (strcasecmp($method, 'POST') == 0) {
-            curl_setopt($curl, CURLOPT_POST, 1);
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         } elseif (strcasecmp($method, 'DELETE') == 0) {
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
@@ -1200,7 +1202,7 @@ class CronAPI
 
     /**
      * Analyzes if the request failed and sends corresponding emails
-     * 
+     *
      * @param  string   $output   String of output or false
      * @param  string   $endpoint Endpoint of the API
      * @return boolean            Success of the request
@@ -1236,16 +1238,14 @@ class CronAPI
 
     /**
      * Creates a cron that will delete debugger in 2 hours
-     * 
+     *
      * @return boolean Success of the cron creation
      */
     public function createCron()
     {
         $endpoint = 'create';
-        $data = [
-            'domain' => $this->domain,
-            'file' => $this->file,
-        ];
+        $data  = 'domain='.$this->domain;
+        $data .= '&file='.$this->file;
         $output = $this->sendRequest($endpoint, 'POST', $data);
         if ($this->analyzeRequest($output, $endpoint)) {
             return true;
@@ -1256,7 +1256,7 @@ class CronAPI
 
     /**
      * Deletes the cron, so it will not be executed
-     * 
+     *
      * @return boolean Success of the deletion
      */
     public function deleteCron()
@@ -1650,7 +1650,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 {
     $time_start = time();
     $archive = zip_open($archiveName);
-    
+
     if (gettype($archive) == 'integer') {  // if error upon opening the archive ...
         $error = ERRORS[$archive];
         throw new Exception($error); // throw it within an exception
@@ -1658,7 +1658,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 
     $counter = 0;
     while($entry = zip_read($archive)){
-        
+
         if ($startNum > ++$counter) {  // skip files before startNum
             continue;
         }
@@ -2019,7 +2019,7 @@ function installPlugin($url)
 
 /**
  * Activates a WordPress plugin
- * 
+ *
  * @param  string $pluginPath Path-to-plugin-folder/path-to-plugin-main-file
  * @return bool               Success of the activation
  */
@@ -2035,8 +2035,8 @@ function activatePlugin($pluginPath)
 
 /**
  * Deactivates a WordPress plugin
- * 
- * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file 
+ *
+ * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file
  * @return bool                Success of the deactivation
  */
 function deactivatePlugin($pluginPath)
@@ -2131,7 +2131,7 @@ function deleteCronAndCache()
 
 /**
  * Installs and activates the UsageDD plugin
- * 
+ *
  * @return array        Success of enabling and error if there was one
  */
 function usageEnable()
@@ -2167,7 +2167,7 @@ function usageEnable()
 
 /**
  * Disables and removes the UsageDD plugin
- * 
+ *
  * @return array       Success of enabling and error if there was one
  */
 function usageDisable()
@@ -2204,7 +2204,7 @@ function usageDisable()
 
 /**
  * Removes all the additional files and itself
- * 
+ *
  * @return null
  */
 function selfDestruct()
@@ -2227,7 +2227,7 @@ function selfDestruct()
 
 
 /*
-    !!! POST request processors section !!! 
+    !!! POST request processors section !!!
 */
 
 
@@ -2364,7 +2364,7 @@ if (authorized()) {
     /* if something needs to be done with an archive */
     if (isset($_POST['archiveName']) && isset($_POST['action'])) {
         $archiveName = $_POST['archiveName'];
-        
+
         if ($_POST['action'] == 'extract') {  // extract archive
             unzipArchivePost($archiveName);
         } elseif ($_POST['action'] == 'view') {  // show content of archive
@@ -2437,7 +2437,7 @@ if (authorized()) {
             $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
                                               );
             if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
-                $success = true;  
+                $success = true;
                 $file = true;
             } else {
                 $success = false;
@@ -2519,7 +2519,7 @@ if (authorized()) {
 }  // end of "if( authorized() )"
 
 ?>
- 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2560,7 +2560,7 @@ var printMsg = function(msg, scroll, color, small) {
     }
 
     $('#progress-log').append(liString);
-    
+
     if (!small) {
         // make the text block higher if the text is wrapped to multiple lines
         lastLi = $('#progress-log > li').last();
@@ -3136,15 +3136,15 @@ var sendAutoLoginRequest = function() {
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (jsonData.file === false) {  // it can also be true and null
-                    printMsg('Failed to upload wp-admin-auto.php.', true, 'warning-progress'); 
-                }   
-                if (!jsonData.siteurl) {    
-                    printMsg('Failed to find siteurl', true, 'warning-progress');   
-                }   
-                if (jsonData.errors.length !== 0) { 
-                    jsonData.errors.forEach(function(item, index, array) {  
-                        printMsg(item, true, 'danger-progress');   
-                    }); 
+                    printMsg('Failed to upload wp-admin-auto.php.', true, 'warning-progress');
+                }
+                if (!jsonData.siteurl) {
+                    printMsg('Failed to find siteurl', true, 'warning-progress');
+                }
+                if (jsonData.errors.length !== 0) {
+                    jsonData.errors.forEach(function(item, index, array) {
+                        printMsg(item, true, 'danger-progress');
+                    });
                 }
             }
         },
@@ -3171,7 +3171,7 @@ var sendSelfDestructRequest = function() {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
-            handleEmptyResponse($("#btnSelfDestruct"), jsonData);
+            handleEmptyResponse($(".btnSelfDestruct"), jsonData);
             if (jsonData.success) {
                 printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
             }
@@ -3215,7 +3215,7 @@ var sendSubResourcesRequest = function() {
 
 /**
  * Sends a request to upload and activate the UsageDD plugin
- * 
+ *
  * @return {null}
  */
 var sendUsageEnableRequest = function() {
@@ -3251,7 +3251,7 @@ var sendUsageEnableRequest = function() {
 
 /**
  * Sends a request to deactivate and remove the UsageDD plugin
- * 
+ *
  * @return {null}
  */
 var sendUsageDisableRequest = function() {
@@ -3601,9 +3601,9 @@ var sendArchiveRequest = function(archiveName, totalNum, startNum) {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
-            
+
             handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
-                
+
             if (jsonData.success) {  // if success, show the success button and message
                 $('#progress-bar').removeClass('progress-bar-striped bg-info progress-bar-animated').addClass('bg-success').text('100%').width('100%');
                 $('#btnArchive').prop("disabled", false);
@@ -3675,9 +3675,9 @@ var processArchiveForm = function(form) {
             printMsg('The returned value is not JSON', true, 'danger-progress');
             return;
         }
-        
+
         handleEmptyResponse($('#btnArchive'), jsonData, defaultFailText);
-            
+
         if (jsonData.numberSuccess && jsonData.checkArchiveSuccess) {
             $("#progress-row").removeClass('d-none').addClass('show');
             $("#progress-container").html('<div class="progress-bar progress-bar-striped bg-info progress-bar-animated" id="progress-bar" role="progressbar" style="width: 2%;">1%</div>');  // 1% is poorly visible with width=1%, so the width is 2 from the start
@@ -3822,7 +3822,7 @@ $(document).ready(function() {
 
     $('#delete-form').submit(function(form) {
         processDeleteForm(form);
-    });    
+    });
 
     $("#btnFlush").click(function() {
         sendFlushRequest(true);  // verbose turned on
@@ -3901,7 +3901,7 @@ var processLoginform = function(form) {
         timeout: 40000,
         success: function(response) {
             var jsonData = JSON.parse(response);
-            
+
             handleEmptyResponse($(''), jsonData);
 
             if (jsonData.success) {
@@ -3927,7 +3927,7 @@ $(document).ready(function() {
 </script>
 <?php endif; ?>
 
-    
+
 
 <!-- *                                      -->
 <!-- *    !!! CSS section !!!               -->
@@ -4060,7 +4060,7 @@ $(document).ready(function() {
             border-top-left-radius: 0;
             border-top-right-radius: 0;
         }
-        
+
         /* default color of all menu items */
         .navbar-dark .navbar-brand, .navbar.navbar-dark .navbar-nav .nav-item .nav-link {
             color: var(--nav-light);
@@ -4075,7 +4075,7 @@ $(document).ready(function() {
         .navbar.navbar-dark .navbar-nav .nav-item.active>span>.nav-link:hover {
             color: var(--nav-dark);
         }
-        
+
         /* switch to darker color on hover for all other (inactive) menu items */
         .navbar.navbar-dark .navbar-nav .nav-item>span>.nav-link:hover {
             color: var(--nav-dark);
@@ -4085,7 +4085,7 @@ $(document).ready(function() {
         #easywp-tab:hover .icon-easywp {
             fill: var(--nav-dark);
         }
-        
+
         /* override animation (default color is white for MDBootstrap). The second selector is the easywp icon that doesn't get animated along with the text */
         .navbar.navbar-dark .navbar-nav .nav-item .nav-link, #easywp-tab .icon-easywp {
             transition-property: all;
@@ -4106,8 +4106,8 @@ $(document).ready(function() {
     }
 
     /**
-     * Style for the svg icon which is the only one different from the other icons 
-     * the were downloaded from awesomefont. These style block makes it similar to 
+     * Style for the svg icon which is the only one different from the other icons
+     * the were downloaded from awesomefont. These style block makes it similar to
      * the awesomefont icons.
      */
     .icon-easywp {
@@ -4393,7 +4393,7 @@ $(document).ready(function() {
             </ul>
         </div>
         <div class="col my-auto">
-            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
+            <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3 btnSelfDestruct" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
             <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
         </div>
     </div>

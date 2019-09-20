@@ -60,6 +60,7 @@ def analyze():
     domain = request.form['domain']
     file = request.form['file']
     validated_inputs = check_inputs({'domain': domain, 'file': file})
+    error = False
     if all(x is True for x in validated_inputs.values()):
         try:
             response = requests.get('http://' + domain + '/' + file,
@@ -108,11 +109,13 @@ def analyze():
                       "<br/>Please make sure the file is removed."
             FlockAPI.send_message(flock_message, color='#FF0000')
 
-    return jsonify({
+    response = {
         'success': success,
-        'error': error,
         'message': message,
-    })
+    }
+    if error:
+        response['error'] = error
+    return jsonify(response)
 
 
 @app.route('/delete/<domain>', methods=['DELETE'])
