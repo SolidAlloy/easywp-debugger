@@ -104,7 +104,7 @@ def analyze():
             db.session.commit()
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'bot':
-            flock_message = "@online I failed to remove the following debugger file: " +\
+            flock_message = "I failed to remove the following debugger file: " +\
                       link_without_query + "<br/>" + message +\
                       "<br/>Please make sure the file is removed."
             FlockAPI.send_message(flock_message, color='#FF0000')
