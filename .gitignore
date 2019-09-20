@@ -1,2 +1,5 @@
 # ignore config of Sublime Text SFTP plugin
 sftp-config.json
+.env
+.flaskenv
+__pycache__/*
