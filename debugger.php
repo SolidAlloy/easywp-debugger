@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.2');
+define('VERSION', '2.2.1');
 
 define('PASSWORD', 'notsoeasywp');
 
