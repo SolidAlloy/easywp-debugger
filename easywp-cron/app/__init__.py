@@ -1,5 +1,7 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler, SMTPHandler
+from os.path import abspath, dirname
 
 from config import Config
 from flask import Flask
@@ -8,7 +10,6 @@ from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_sslify import SSLify
-
 
 app = Flask(__name__)
 # WSGI must be provided with "application". "app" variable can't be used
@@ -20,6 +21,20 @@ mail = Mail(app)
 cache = Cache(app)
 sslify = SSLify(app, permanent=True)
 
+
+parent_dir = dirname(dirname(abspath(__file__)))
+logs_dir = os.path.join(parent_dir, 'logs')
+if not os.path.exists(logs_dir):
+    os.mkdir(logs_dir)
+
+app.error_logger = logging.getLogger('errors')
+app.error_logger.setLevel(logging.ERROR)
+
+app.info_logger = logging.getLogger('info')
+app.info_logger.setLevel(logging.INFO)
+
+app.job_logger = logging.getLogger('jobs')
+app.job_logger.setLevel(logging.INFO)
 
 if not app.debug:  # Use SMTPHandler only in production
     if app.config['MAIL_SERVER']:
@@ -36,19 +51,35 @@ if not app.debug:  # Use SMTPHandler only in production
             subject='EasyWP Cron Failure',
             credentials=auth, secure=secure)
         mail_handler.setLevel(logging.ERROR)
-        app.logger.addHandler(mail_handler)
+        app.error_logger.addHandler(mail_handler)
 
-# Use rotating file in production and development. It is especially useful in
-# an environment like Passenger which streams error log into Apache log
-file_handler = RotatingFileHandler('error_log', maxBytes=10240,
-                                   backupCount=10)
-file_handler.setFormatter(logging.Formatter(
+
+# Use rotating error log in production and development. It is especially useful in
+# an environment like Passenger which streams error log into Apache log.
+error_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'error_log'),
+                                         maxBytes=10240, backupCount=10)
+error_file_handler.setFormatter(logging.Formatter(
     '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
-file_handler.setLevel(logging.INFO)
-app.logger.addHandler(file_handler)
+error_file_handler.setLevel(logging.ERROR)
+app.error_logger.addHandler(error_file_handler)
 
-app.logger.setLevel(logging.INFO)
-app.logger.info('EasyWP Cron Startup')
+
+# A log file that contains only INFO level messages.
+info_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'info_log'),
+                                        maxBytes=10240, backupCount=10)
+info_file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+info_file_handler.setLevel(logging.INFO)
+app.info_logger.addHandler(info_file_handler)
+
+
+# This log will contain messages about jobs creation, execution, and removal.
+job_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'job_log'),
+                                       maxBytes=10240, backupCount=10)
+job_file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s %(levelname)s: %(message)s'))
+job_file_handler.setLevel(logging.INFO)
+app.job_logger.addHandler(job_file_handler)
 
 
 from app import models, routes
