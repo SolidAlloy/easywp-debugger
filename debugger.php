@@ -3128,7 +3128,7 @@ var sendAutoLoginRequest = function() {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
                 return;
             }
-            handleEmptyResponse($("#btnAutoLogin"), jsonData);
+            handleEmptyResponse($(".btnAutoLogin"), jsonData);
             if (jsonData.success) {
                 printMsg('You will be redirected in a second.', true, 'success-progress');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
@@ -4379,7 +4379,7 @@ $(document).ready(function() {
         <div class="col-6">
             <ul class="nav nav-tabs nav-justified" id="nav-tab" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
+                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name">&nbsp;EasyWP</span></a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
@@ -4394,7 +4394,7 @@ $(document).ready(function() {
         </div>
         <div class="col my-auto">
             <button type="button" class="btn btn-nav btn-red float-right ml-5 mr-3 btnSelfDestruct" id="btnSelfDestruct"><i class="fas fa-trash fa-fw">&nbsp;</i> Remove File From Server</button>
-            <button type="button" class="btn btn-nav unique-color float-right" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
+            <button type="button" class="btn btn-nav unique-color float-right btnAutoLogin" id="btnAutoLogin"><i class="fas fa-user fa-fw">&nbsp;</i> Log into wp-admin</button>
         </div>
     </div>
 
