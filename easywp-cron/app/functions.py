@@ -30,7 +30,7 @@ def catch_custom_exception(func):
         try:
             return func(*args, **kwargs)
         except:
-            app.logger.exception("Exception occurred")
+            app.error_logger.exception("Exception occurred")
             response = {
                 'success': False,
                 'message': '500 Internal Server Error'

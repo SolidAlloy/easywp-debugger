@@ -86,7 +86,7 @@ class FlockAPI:
                 + json.dumps(payload)
             result = False
         if not result:
-            app.logger.error(error)
+            app.error_logger.error(error)
         return result
 
     def get(endpoint, params):
@@ -203,7 +203,7 @@ class FlockAPI:
             }
 
         elif json_request['name'] == 'chat.receiveMessage':
-            app.logger.info('The message was received from '
-                            + json_request['message']['from']
-                            + '. The text is: '
-                            + json_request['message']['text'])
+            app.info_logger.info('The message was received from '
+                                 + json_request['message']['from']
+                                 + '. The text is:\n'
+                                 + json_request['message']['text'] + '\n')

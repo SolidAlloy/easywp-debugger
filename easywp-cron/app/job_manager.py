@@ -1,4 +1,5 @@
 import subprocess
+from functools import wraps
 
 from app import app, cache
 from flask import url_for
@@ -10,6 +11,35 @@ class JobManager:
     It can check length of the queue, find jobs by their content,
         add and delete jobs.
     """
+
+    def log(func, message, *args, **kwargs):
+        """Log the response of the function to cron_log.
+
+        Arguments:
+            func {object} -- Function object, result of which will be
+                logged.
+            message {string} -- Message, returned by the function (the
+                function return body must be [result, message]).
+            args {list} -- Arguments used by the function.
+            kwargs {dict} -- Keyword arguments used by the function.
+        """
+        args_list_string = ', '.join(args)
+        if kwargs:
+            # This will produce a string like ", arg1=value1, arg2=value2".
+            kwargs_list_string = ', ' + ', '.join([key+'='+kwargs[key] for key in kwargs.keys()])
+        else:
+            kwargs_list_string = ''
+        app.job_logger.info('Response in ' + func.__name__ + '('
+                            + args_list_string + kwargs_list_string + '): '
+                            + message)
+
+    def log_job(func):
+        @wraps(func)
+        def decorated_function(*args, **kwargs):
+            result, message = func(*args, **kwargs)
+            JobManager.log(func, message, *args, **kwargs)
+            return [result, message]
+        return decorated_function
 
     def get_queue():
         """Get string, containing list of jobs.
@@ -67,6 +97,7 @@ class JobManager:
                 return number
         return False
 
+    @log_job
     def add_job(domain, file):
         """Add a job to the atq queue.
 
@@ -104,6 +135,7 @@ class JobManager:
             else:
                 return [False, 'Job creation failed.']
 
+    @log_job
     def delete_job(job_id):
         """Delete a job from the queue.
 
