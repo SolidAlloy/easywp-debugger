@@ -4379,7 +4379,7 @@ $(document).ready(function() {
         <div class="col-6">
             <ul class="nav nav-tabs nav-justified" id="nav-tab" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name"> EasyWP</span></a>
+                    <a class="nav-link easywp-tab active" id="easywp-tab" data-toggle="tab" href="#easywp" role="tab" aria-controls="easywp" aria-selected="true"><svg class="icon-easywp"><use xlink:href="#icon-easywp"></use></svg><span class="name">&nbsp;EasyWP</span></a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link debug-tab" id="debug-tab" data-toggle="tab" href="#debug" role="tab" aria-controls="debug" aria-selected="false"><i class="fas fa-cog fa-fw">&nbsp;</i> Debug</a>
