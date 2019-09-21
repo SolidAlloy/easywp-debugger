@@ -18,7 +18,7 @@ class JobManager:
         Arguments:
             func {object} -- Function object, result of which will be
                 logged.
-            message {string} -- Message, returned by the function (the
+            message {str} -- Message, returned by the function (the
                 function return body must be [result, message]).
             args {list} -- Arguments used by the function.
             kwargs {dict} -- Keyword arguments used by the function.
@@ -34,6 +34,19 @@ class JobManager:
                             + message)
 
     def log_job(func):
+        """Call log() each time a function returns
+            some message.
+
+        Decorators:
+            wraps
+
+        Arguments:
+            func {object} -- Function, output of which should be logged.
+
+        Returns:
+            object -- Decorated function that will log the output of
+                the inner "func" function.
+        """
         @wraps(func)
         def decorated_function(*args, **kwargs):
             result, message = func(*args, **kwargs)
@@ -42,7 +55,7 @@ class JobManager:
         return decorated_function
 
     def get_queue():
-        """Get string, containing list of jobs.
+        """Get string, containing a list of jobs.
 
         Get output from the atq command reflecting the list of job IDs.
 
