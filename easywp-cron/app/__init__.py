@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from logging.handlers import RotatingFileHandler, SMTPHandler
 from os.path import abspath, dirname
 
@@ -26,6 +27,9 @@ parent_dir = dirname(dirname(abspath(__file__)))
 logs_dir = os.path.join(parent_dir, 'logs')
 if not os.path.exists(logs_dir):
     os.mkdir(logs_dir)
+
+logging.Formatter.converter = time.gmtime
+time_format = "%Y-%m-%d %H:%M:%S %z"
 
 app.error_logger = logging.getLogger('errors')
 app.error_logger.setLevel(logging.ERROR)
@@ -59,7 +63,7 @@ if not app.debug:  # Use SMTPHandler only in production
 error_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'error_log'),
                                          maxBytes=10240, backupCount=10)
 error_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]', time_format))
 error_file_handler.setLevel(logging.ERROR)
 app.error_logger.addHandler(error_file_handler)
 
@@ -68,7 +72,7 @@ app.error_logger.addHandler(error_file_handler)
 info_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'info_log'),
                                         maxBytes=10240, backupCount=10)
 info_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+    '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]', time_format))
 info_file_handler.setLevel(logging.INFO)
 app.info_logger.addHandler(info_file_handler)
 
@@ -77,7 +81,7 @@ app.info_logger.addHandler(info_file_handler)
 job_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'job_log'),
                                        maxBytes=10240, backupCount=10)
 job_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s'))
+    '%(asctime)s %(levelname)s: %(message)s', time_format))
 job_file_handler.setLevel(logging.INFO)
 app.job_logger.addHandler(job_file_handler)
 

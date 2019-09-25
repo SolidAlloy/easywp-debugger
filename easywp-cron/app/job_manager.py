@@ -49,9 +49,13 @@ class JobManager:
         """
         @wraps(func)
         def decorated_function(*args, **kwargs):
-            result, message = func(*args, **kwargs)
-            JobManager.log(func, message, *args, **kwargs)
-            return [result, message]
+            output = func(*args, **kwargs)
+            if type(output) is list:
+                JobManager.log(func, output[1], *args, **kwargs)
+            elif type(output) is str:
+                # if find_job() returned False, print the response as "False" in the log.
+                JobManager.log(func, output or 'False', *args, **kwargs)
+            return output
         return decorated_function
 
     def get_queue():
@@ -87,6 +91,7 @@ class JobManager:
         lines = queue.split('\n')[:-1]  # Split output into lines
         return len(lines)
 
+    @log_job
     def find_job(domain):
         """Find a job ID by domain.
 
