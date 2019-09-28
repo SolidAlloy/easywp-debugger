@@ -21,6 +21,7 @@ session_start();
 
 define('VERSION', '2.2.1');
 
+// Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
 
 define('ERRORS', [0 => 'No error',
@@ -55,8 +56,8 @@ define('DS', DIRECTORY_SEPARATOR);
 define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
 
-// send error reports regarding easywp-cron to
-define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com');
+// send error reports regarding easywp-cron failures to the following addresses
+define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, perepelartem@gmail.com');
 
 
 /*
