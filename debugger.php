@@ -4604,7 +4604,7 @@ $(document).ready(function() {
 </div>
 
 <div class="alert alert-success alert-dismissible fade d-none version-notification" id="version-new" role="alert">
-  <strong>New version is out!</strong> <br> Check it <a href="https://collab.namecheap.net/display/~artyomperepelitsa/EasyWP+Debugger" class="text-info">here</a>
+  <strong>New version is out!</strong> <br> Download it <a href="https://debugger.nctool.me/debugger-generator.php" class="text-info">here</a>
   <button type="button" class="close" data-dismiss="alert" aria-label="Close">
     <span aria-hidden="true">&times;</span>
   </button>
