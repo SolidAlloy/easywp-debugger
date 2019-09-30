@@ -2120,8 +2120,10 @@ function login($password)
  */
 function deleteCronAndCache()
 {
-    $cronAPI = new CronAPI();
-    $cronAPI->deleteCron();
+    if (!isset($_GET['silent'])) {  // if silent is set, don't try to delete cron as the removal request is already sent by EasyWP Cron.
+        $cronAPI = new CronAPI();
+        $cronAPI->deleteCron();
+    }
 
     try {
         $cache = new EasyWP_Cache();
