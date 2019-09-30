@@ -3165,6 +3165,10 @@ var sendSelfDestructRequest = function() {
         type: "POST",
         timeout: 20000,
         data: {selfDestruct: 'submit'},
+        beforeSend: function() {
+            // show a success message before receiving the callback because file removal can't be unsuccessful but can take a lot of time (especially communicating with easywp-cron)
+            printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
+        },
         success: function(response) {
             var jsonData;
             try {
@@ -3174,9 +3178,6 @@ var sendSelfDestructRequest = function() {
                 return;
             }
             handleEmptyResponse($(".btnSelfDestruct"), jsonData);
-            if (jsonData.success) {
-                printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
-            }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
