@@ -21,6 +21,7 @@ session_start();
 
 define('VERSION', '2.2.1');
 
+// Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
 
 define('ERRORS', [0 => 'No error',
@@ -55,8 +56,8 @@ define('DS', DIRECTORY_SEPARATOR);
 define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
 
-// send error reports regarding easywp-cron to
-define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com');
+// send error reports regarding easywp-cron failures to the following addresses
+define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, perepelartem@gmail.com');
 
 
 /*
@@ -1213,7 +1214,8 @@ class CronAPI
         if ($output) {
             $jsonData = json_decode($output);
             if ($jsonData) {
-                if ($jsonData->success) {
+                // do not report "Job is already created." as it doesn't mean any failures on the side of debugger or easywp-cron
+                if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
                     $result = true;
                 } else {
                     $emailBody  = "Request to /".$endpoint." failed.\n";
@@ -2118,8 +2120,10 @@ function login($password)
  */
 function deleteCronAndCache()
 {
-    $cronAPI = new CronAPI();
-    $cronAPI->deleteCron();
+    if (!isset($_GET['silent'])) {  // if silent is set, don't try to delete cron as the removal request is already sent by EasyWP Cron.
+        $cronAPI = new CronAPI();
+        $cronAPI->deleteCron();
+    }
 
     try {
         $cache = new EasyWP_Cache();
@@ -3163,6 +3167,10 @@ var sendSelfDestructRequest = function() {
         type: "POST",
         timeout: 20000,
         data: {selfDestruct: 'submit'},
+        beforeSend: function() {
+            // show a success message before receiving the callback because file removal can't be unsuccessful but can take a lot of time (especially communicating with easywp-cron)
+            printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
+        },
         success: function(response) {
             var jsonData;
             try {
@@ -3172,9 +3180,6 @@ var sendSelfDestructRequest = function() {
                 return;
             }
             handleEmptyResponse($(".btnSelfDestruct"), jsonData);
-            if (jsonData.success) {
-                printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
-            }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
