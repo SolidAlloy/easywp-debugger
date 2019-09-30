@@ -46,6 +46,11 @@ function randomFilename($length)
     return randomString($possibleChars, $length);
 }
 
+
+//                      //
+//      Main Frame      //
+//                      //
+
 // URL to download debugger.min.php from
 $debuggerMinUrl = 'https://raw.githubusercontent.com/SolidAlloy/easywp-debugger/master/debugger.min.php';
 $debuggerMinContent = file_get_contents($debuggerMinUrl);

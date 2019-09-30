@@ -1214,9 +1214,10 @@ class CronAPI
         if ($output) {
             $jsonData = json_decode($output);
             if ($jsonData) {
-                if ($jsonData->success) {
+                // do not report "Job is already created." as it doesn't mean any failures on the side of debugger or easywp-cron
+                if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
                     $result = true;
-                } else {
+                } else {}
                     $emailBody  = "Request to /".$endpoint." failed.\n";
                     $emailBody .= "Reason: ".$jsonData->message."\n";
                 }
