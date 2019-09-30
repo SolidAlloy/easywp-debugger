@@ -64,7 +64,10 @@ def analyze():
     if all(x is True for x in validated_inputs.values()):
         try:
             response = requests.get('http://' + domain + '/' + file,
-                                    params={'selfDestruct': '1'})
+                                    params={
+                                        'selfDestruct': '1',
+                                        'silent': '1',
+                                    })
         except Timeout:
             success = False
             error = 'timeout'
