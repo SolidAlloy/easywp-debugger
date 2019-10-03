@@ -13,6 +13,12 @@ from flask import jsonify, request
 from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 
+@app.route('/', methods=['GET'])
+@catch_custom_exception
+def home():
+    return jsonify({'status': 'ok'})
+
+
 @app.route('/create', methods=['POST'])
 @catch_custom_exception
 def create():
