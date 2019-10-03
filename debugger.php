@@ -3978,6 +3978,13 @@ var sendCreateCronRequest = function() {
         } else {
             msg = 'Uncaught Error.\n' + jqXHR.responseText;
         }
+        if (msg == 'Failed To Connect. Network Error.') {
+            console.log(
+                '%c createCron Request: %c Not possible to determine success of the request as the page was reloaded.',
+                'font-weight: bold;',
+                'color: yellow; font-weight: normal;'
+            );
+        }
         console.log(
             '%c createCron Request: %c ' + msg,
             'font-weight: bold;',
@@ -3988,7 +3995,12 @@ var sendCreateCronRequest = function() {
 
 
 var processLoginform = function(form) {
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Logging in...';
+    var failText = 'LOG IN';
+    $button = $('#btnLogin');
     form.preventDefault();
+    $button.prop("disabled", true);
+    $button.html(loadingText);
     sendCreateCronRequest();
     $('#password-invalid').removeClass('show').addClass('d-none');
     var password = $("#login-form :input[name='password']")[0].value;
@@ -4009,13 +4021,19 @@ var processLoginform = function(form) {
             if (jsonData.success) {
                 location.reload(true);
             } else if (jsonData.error) {
+                $button.prop("disabled", false);
+                $button.html(failText);
                 printMsg(jsonData.error);
             } else {
+                $button.prop("disabled", false);
+                $button.html(failText);
                 printMsg('Invalid password');
             }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
+            $button.prop("disabled", false);
+            $button.html(failText);
         }
     });
 };
@@ -4720,7 +4738,7 @@ $(document).ready(function() {
         <form id="login-form" style="display: inline-block;">
             <input type="password" class="form-control mb-0 mx-auto" id="password" name="password" placeholder="Password" style="width: 200px;">
             <small id="password-invalid" class="form-text text-danger d-none"></small>
-            <button type="submit" class="btn unique-color mt-3">LOG IN</button>
+            <button type="submit" class="btn unique-color mt-3" id="btnLogin">LOG IN</button>
         </form>
     </div>
 <?php endif; ?>
