@@ -87,7 +87,7 @@ def analyze():
             error = 'unknown'
             message = "Unknown exception occurred when trying to access the link."
         if response.status_code == 200:
-            if response.json() == {u'success': True}:
+            if response.json() == {'success': True}:
                 success = True
                 message = "The file was removed successfully."
             else:
