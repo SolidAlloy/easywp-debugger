@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.2.2');
+define('VERSION', '2.2.3');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -559,12 +559,12 @@ class EasyWP_Cache
     protected function getNeededKeys()
     {
         $keysDict = [];
-        $cronKey = 'cronCreateSent';
+        $cronKeys = $this->keys('*:cronCreateSent');
         $loginKeys = $this->keys('*~login:*');
-        if ($this->exists($cronKey)) {
-            $keysDict[$cronKey] = [
-                $this->fetch($cronKey),
-                $this->ttl($cronKey),
+        foreach ($cronKeys as $key) {
+            $keysDict[$key] = [
+                $this->fetch($key),
+                $this->ttl($key),
             ];
         }
         foreach ($loginKeys as $key) {
@@ -2076,17 +2076,7 @@ function login($password)
     try {
         $cache = new EasyWP_Cache();
     } catch (Exception $e) {
-        $cronAPI = new CronAPI();  // since cache isn't supported here, send createCron request before checking in cache if it was already sent
-        $cronAPI->createCron();
         throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
-    }
-
-    $cronKey = 'cronCreateSent';
-    $cronCreateSent = $cache->fetch($cronKey);
-    if (!$cronCreateSent) {  // send the cron if it wasn't sent before
-        $cronAPI = new CronAPI();
-        $cronAPI->createCron();
-        $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
     }
 
     if ($cache->getHandler() == 'redis') {
@@ -2103,7 +2093,6 @@ function login($password)
 
     if (!passwordMatch($password)) {
         $blocked = (int)$cache->fetch($blockedKey);
-
         $cache->store($failedLoginKey, $tries+1, pow(2, $blocked+1)*60);  // store tries for 2^(x+1) minutes: 2, 4, 8, 16, ...
         $cache->store($blockedKey, $blocked+1, 86400);  // store number of times blocked for 24 hours
         return false;
@@ -2112,6 +2101,30 @@ function login($password)
         $cache->delete($blockedKey);
         return true;
     }
+}
+
+/**
+ * send the cron creation request and return its result.
+ * @return string Success of the request or 'alreadySent' in case the request was already sent.
+ */
+function createCron()
+{
+    try {
+        $cache = new EasyWP_Cache();
+        $cronKey = basename(__FILE__).':cronCreateSent';
+        $cronCreateSent = $cache->fetch($cronKey);
+        if ($cronCreateSent) {
+            $status = 'alreadySent';
+        } else {  // send the cron if it wasn't sent before
+            $cronAPI = new CronAPI();
+            $status = $cronAPI->createCron() ? 'ok' : 'fail';
+            $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
+        }
+    } catch (Exception $e) {
+        $cronAPI = new CronAPI();  // since cache isn't supported here, send createCron request without checking in cache whether it was already sent
+        $status = $cronAPI->createCron() ? 'ok' : 'fail';
+    }
+    return $status;
 }
 
 /**
@@ -2127,7 +2140,7 @@ function deleteCronAndCache()
 
     try {
         $cache = new EasyWP_Cache();
-        $cache->delete('cronCreateSent');
+        $cache->delete(basename(__FILE__).':cronCreateSent');
     } catch (Exception $e) {
         // do nothing
     }
@@ -2251,6 +2264,12 @@ if (isset($_POST['login'])) {
     die(json_encode(array(
         'success' => $success,
         'error' => $error,
+    )));
+}
+
+if (isset($_POST['createCron'])) {
+    die(json_encode(array(
+        'status' => createCron(),
     )));
 }
 
@@ -3891,8 +3910,86 @@ $(document).ready(function() {
 <?php else: ?>
 <script>
 
+/**
+ * Send a request to create cron on the remote server (to remove debugger in some time)
+ */
+var sendCreateCronRequest = function() {
+    $.ajax({
+        type: "POST",
+        data: {createCron: 'submit'},
+        timeout: 40000,
+    })
+    .done(function( response ) {
+        var jsonData;
+        try {
+            jsonData = JSON.parse(response);
+        } catch (e) {
+            console.log(
+                '%c createCron Request: %c The returned value is not JSON.',
+                'font-weight: bold;',
+                'color: red; font-weight: normal;'
+            );
+            return;
+        }
+
+        if (!$.trim(jsonData)){
+            console.log(
+                '%c createCron Request: %c Empty response was returned from the AJAX request.',
+                'font-weight: bold;',
+                'color: red; font-weight: normal;'
+            );
+        }
+
+        if (jsonData.status == 'ok') {
+            console.log(
+                '%c createCron Request: %c The cron was created successfully.',
+                'font-weight: bold;',
+                'color: green; font-weight: normal;'
+            );
+        } else if (jsonData.status == 'alreadySent') {
+            console.log(
+                '%c createCron Request: %c The cron create request is already sent.',
+                'font-weight: bold;',
+                'color: orange; font-weight: normal;'
+            );
+        } else {
+            console.log(
+                '%c createCron Request: %c The cron creation failed.',
+                'font-weight: bold;',
+                'color: red; font-weight: normal;'
+            );
+        }
+    })
+    .fail(function( jqXHR, exception ) {
+        if (jqXHR.status === 0) {
+            msg = 'Failed To Connect. Network Error';
+        } else if (jqXHR.status == 503) {
+            msg = 'Service Unavailable. [503]';
+        } else if (jqXHR.status == 404) {
+            msg = 'Requested page not found. [404]';
+        } else if (jqXHR.status == 500) {
+            msg = 'Internal Server Error [500].';
+        } else if (exception === 'parsererror') {
+            msg = 'Requested JSON parse failed.';
+        } else if (exception === 'timeout') {
+            msg = 'Time out error.';
+        } else if (exception === 'abort') {
+            msg = 'Ajax request aborted.';
+        } else {
+            msg = 'Uncaught Error.\n' + jqXHR.responseText;
+        }
+        console.log(
+            '%c createCron Request: %c ' + msg,
+            'font-weight: bold;',
+            'color: red; font-weight: normal;'
+        );
+    });
+};
+
+
 var processLoginform = function(form) {
     form.preventDefault();
+    sendCreateCronRequest();
     $('#password-invalid').removeClass('show').addClass('d-none');
     var password = $("#login-form :input[name='password']")[0].value;
     if (handleEmptyField(password)) {
