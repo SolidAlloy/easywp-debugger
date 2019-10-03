@@ -2692,7 +2692,7 @@ var handleErrors = function (jqXHR, exception, excludeList) {
     }
 
     if (jqXHR.status === 0) {
-        msg = 'Failed To Connect. Network Error';
+        msg = 'Network Error. Please try again.';
     } else if (jqXHR.status == 503) {
         msg = 'Service Unavailable. [503]';
     } else if (jqXHR.status == 404) {
@@ -3962,7 +3962,7 @@ var sendCreateCronRequest = function() {
     })
     .fail(function( jqXHR, exception ) {
         if (jqXHR.status === 0) {
-            msg = 'Failed To Connect. Network Error';
+            msg = 'Failed To Connect. Network Error.';
         } else if (jqXHR.status == 503) {
             msg = 'Service Unavailable. [503]';
         } else if (jqXHR.status == 404) {
