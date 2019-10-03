@@ -3226,7 +3226,7 @@ var sendSubResourcesRequest = function() {
             handleEmptyResponse($("#btnSubResources"), jsonData);
             if (jsonData.podName) {
                 printMsg('You will be redirected in a second.', true, 'success-progress');
-                setTimeout(function() { window.open("https://grafana.namecheapcloud.net/d/sTf0slgWk/kubernetes-pod?orgId=1&var-namespace=default&var-pod="+jsonData.podName); }, 1000);
+                setTimeout(function() { window.open("https://grafana.namecheapcloud.net/d/gr00yHhWk/pods?orgId=1&var-namespace=default&var-pod="+jsonData.podName); }, 1000);
             } else {
                 printMsg('Fail. The the pod name was not found.', true, 'warning-progress');
             }
