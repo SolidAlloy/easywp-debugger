@@ -1215,11 +1215,26 @@ class CronAPI
             $jsonData = json_decode($output);
             if ($jsonData) {
                 // do not report "Job is already created." as it doesn't mean any failures on the side of debugger or easywp-cron
-                if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
-                    $result = true;
-                } else {
-                    $emailBody  = "Request to /".$endpoint." failed.\n";
-                    $emailBody .= "Reason: ".$jsonData->message."\n";
+                if ($endpoint == 'create') {
+                    if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
+                        $result = true;
+                    } else {
+                        $emailBody  = "Request to /".$endpoint." failed.\n";
+                        $emailBody .= "Reason: ".$jsonData->message."\n";
+                    }
+                } elseif ($endpoint == 'delete') {
+                    $selfFilename = basename(__FILE__);
+                    if property_exists($jsonData, $success) {  // if success is in the root of json, it is always False
+                        $emailBody  = "Request to /".$endpoint." failed.\n";
+                        $emailBody .= "Reason: ".$jsonData->message."\n";
+                    } elseif (property_exists($jsonData, $selfFilename)) {
+                        if ($jsonData->$selfFilename == true) {
+                            $result = true;
+                        } else {
+                            $emailBody  = "Request to /".$endpoint." failed.\n";
+                            $emailBody .= "Reason: ".$jsonData->$selfFilename->message."\n";
+                        }
+                    }
                 }
             } else {
                 $emailBody  = "The output returned from /".$endpoint." is not JSON.\n";
