@@ -2,6 +2,7 @@ import subprocess
 from functools import wraps
 
 from app import app, cache
+from app.functions import job_file_regex
 from flask import url_for
 
 
@@ -26,7 +27,8 @@ class JobManager:
         args_list_string = ', '.join(args)
         if kwargs:
             # This will produce a string like ", arg1=value1, arg2=value2".
-            kwargs_list_string = ', ' + ', '.join([key+'='+kwargs[key] for key in kwargs.keys()])
+            kwargs_list_string = ', ' + ', '.join(
+                [key+'='+kwargs[key] for key in kwargs.keys()])
         else:
             kwargs_list_string = ''
         app.job_logger.info('Response in ' + func.__name__ + '('
@@ -50,11 +52,13 @@ class JobManager:
         @wraps(func)
         def decorated_function(*args, **kwargs):
             output = func(*args, **kwargs)
-            if type(output) is list:
+            if output and type(output[0]) is bool:
                 JobManager.log(func, output[1], *args, **kwargs)
-            elif type(output) is str:
-                # if find_job() returned False, print the response as "False" in the log.
-                JobManager.log(func, output or 'False', *args, **kwargs)
+            else:
+                # if find_job() returned an empty list, print the response as
+                # "False" in the log.
+                JobManager.log(
+                    func, ', '.join(output) or 'False', *args, **kwargs)
             return output
         return decorated_function
 
@@ -92,7 +96,7 @@ class JobManager:
         return len(lines)
 
     @log_job
-    def find_job(domain):
+    def find_jobs(domain, file=None):
         """Find a job ID by domain.
 
         Arguments:
@@ -101,9 +105,10 @@ class JobManager:
         Returns:
             mixed -- str if the job ID is returned; False on failure.
         """
+        result_numbers = []
         queue = JobManager.get_queue()
         if not queue:
-            return False
+            return []
         lines = queue.split('\n')[:-1]  # Split output into lines
         # Get only the job number for each line
         numbers = [line.split('\t', 1)[0] for line in lines]
@@ -111,9 +116,23 @@ class JobManager:
             output = subprocess.run(['at', '-c', number],
                                     capture_output=True, text=True).stdout
             # Get content of each job until the domain is found
-            if output.find(domain) != -1:
-                return number
-        return False
+            if file:
+                if output.find(domain) != -1 and output.find(file) != -1:
+                    result_numbers.append(number)
+            else:
+                if output.find(domain) != -1:
+                    result_numbers.append(number)
+        return result_numbers
+
+    @log_job
+    def find_file_in_job(job_id):
+        output = subprocess.run(['at', '-c', str(job_id)],
+                                capture_output=True, text=True).stdout
+        result = job_file_regex.search(output)
+        if result:
+            return result[1]  # first group of the search result
+        else:
+            return False
 
     @log_job
     def add_job(domain, file):
@@ -127,11 +146,11 @@ class JobManager:
             file {str} -- Name of the file to remove.
         """
         try:
-            job_in_queue = JobManager.find_job(domain)
+            jobs_in_queue = JobManager.find_jobs(domain, file)
         except SystemError:
             return [False, '"atq" doesn\'t work on the server.']
 
-        if job_in_queue:
+        if jobs_in_queue:
             return [False, 'Job is already created.']
         else:
             if JobManager.get_queue_length() > app.config["MAX_QUEUE_LENGTH"]:  # 240 by default
@@ -158,7 +177,7 @@ class JobManager:
         """Delete a job from the queue.
 
         Arguments:
-            job_id {int} -- ID of the job to delete.
+            job_id {int/str} -- ID of the job to delete.
         """
         result = subprocess.run(['atrm', str(job_id)])
         if result.returncode == 0:

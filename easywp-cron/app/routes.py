@@ -108,7 +108,8 @@ def analyze():
         link_without_query = response.url.split('?')[0]
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'email':
-            failed_link = FailedLink(link=link_without_query, error=error, message=message)
+            failed_link = FailedLink(
+                link=link_without_query, error=error, message=message)
             db.session.add(failed_link)
             db.session.commit()
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
@@ -143,22 +144,25 @@ def delete(domain):
         str -- JSON string containing the success of the job removal
             and an additional message.
     """
+    result_dict = {}
     validated_inputs = check_inputs({'domain': domain})
     if validated_inputs['domain']:
-        job_id = JobManager.find_job(domain)
-        if job_id:
-            success, message = JobManager.delete_job(job_id)
+        job_ids = JobManager.find_jobs(domain)
+        if job_ids:
+            for job_id in job_ids:  # remove all debugger files for this domain
+                file = JobManager.find_file_in_job(job_id)
+                if file:
+                    result_dict[file] = JobManager.delete_job(job_id)
+                else:
+                    result_dict[job_id] = JobManager.delete_job(job_id)
         else:
-            success = False
-            message = "There is no such job."
+            result_dict['success'] = False
+            result_dict['message'] = "There are no jobs for this domain."
     else:
-        success = False
-        message = 'The domain is invalid.'
+        result_dict['success'] = False
+        result_dict['message'] = 'The domain is invalid.'
 
-    return jsonify({
-        'success': success,
-        'message': message,
-    })
+    return jsonify(result_dict)
 
 
 @app.route('/report-failed-links', methods=['GET'])
