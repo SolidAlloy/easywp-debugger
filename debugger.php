@@ -1164,16 +1164,16 @@ class CronAPI
      * @param  array  $data     Data to be sent in a POST request
      * @return mixed            string of output on success or false on fail
      */
-    protected function sendRequest($endpoint, $method, $data=null)
+    protected function sendRequest($endpoint, $method, $data)
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         if (strcasecmp($method, 'POST') == 0) {
             curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         } elseif (strcasecmp($method, 'DELETE') == 0) {
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
@@ -1215,26 +1215,11 @@ class CronAPI
             $jsonData = json_decode($output);
             if ($jsonData) {
                 // do not report "Job is already created." as it doesn't mean any failures on the side of debugger or easywp-cron
-                if ($endpoint == 'create') {
-                    if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
-                        $result = true;
-                    } else {
-                        $emailBody  = "Request to /".$endpoint." failed.\n";
-                        $emailBody .= "Reason: ".$jsonData->message."\n";
-                    }
-                } elseif ($endpoint == 'delete') {
-                    $selfFilename = basename(__FILE__);
-                    if property_exists($jsonData, $success) {  // if success is in the root of json, it is always False
-                        $emailBody  = "Request to /".$endpoint." failed.\n";
-                        $emailBody .= "Reason: ".$jsonData->message."\n";
-                    } elseif (property_exists($jsonData, $selfFilename)) {
-                        if ($jsonData->$selfFilename == true) {
-                            $result = true;
-                        } else {
-                            $emailBody  = "Request to /".$endpoint." failed.\n";
-                            $emailBody .= "Reason: ".$jsonData->$selfFilename->message."\n";
-                        }
-                    }
+                if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
+                    $result = true;
+                } else {
+                    $emailBody  = "Request to /".$endpoint." failed.\n";
+                    $emailBody .= "Reason: ".$jsonData->message."\n";
                 }
             } else {
                 $emailBody  = "The output returned from /".$endpoint." is not JSON.\n";
@@ -1279,7 +1264,8 @@ class CronAPI
     public function deleteCron()
     {
         $endpoint = 'delete/'.$this->domain;
-        $output = $this->sendRequest($endpoint, 'DELETE');
+        $data .= 'file='.$this->file;
+        $output = $this->sendRequest($endpoint, 'DELETE', $data);
         if ($this->analyzeRequest($output, $endpoint)) {
             return true;
         } else {

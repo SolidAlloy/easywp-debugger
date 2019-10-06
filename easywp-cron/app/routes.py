@@ -145,22 +145,38 @@ def delete(domain):
             and an additional message.
     """
     result_dict = {}
-    validated_inputs = check_inputs({'domain': domain})
-    if validated_inputs['domain']:
-        job_ids = JobManager.find_jobs(domain)
-        if job_ids:
-            for job_id in job_ids:  # remove all debugger files for this domain
-                file = JobManager.find_file_in_job(job_id)
-                if file:
-                    result_dict[file] = JobManager.delete_job(job_id)
-                else:
-                    result_dict[job_id] = JobManager.delete_job(job_id)
-        else:
-            result_dict['success'] = False
-            result_dict['message'] = "There are no jobs for this domain."
+    if 'file' in request.form:
+        file = request.form['file']
     else:
-        result_dict['success'] = False
-        result_dict['message'] = 'The domain is invalid.'
+        file = None
+    if file:
+        validated_inputs = check_inputs({'domain': domain, 'file': file})
+    else:
+        validated_inputs = check_inputs({'domain': domain})
+
+    if all(x is True for x in validated_inputs.values()):
+        if file:
+            job_ids = JobManager.find_jobs(domain, file)
+            if job_ids:
+                job_id = job_ids[0]
+                result_dict['success'], result_dict['message'] = JobManager.delete_job(job_id)
+            else:
+                result_dict['success'] = False
+                result_dict['message'] = "There are no jobs for these domain and file."
+        else:
+            job_ids = JobManager.find_jobs(domain)
+            if job_ids:
+                for job_id in job_ids:  # remove all debugger files for this domain
+                    file = JobManager.find_file_in_job(job_id)
+                    if file:
+                        result_dict[file] = JobManager.delete_job(job_id)
+                    else:
+                        result_dict[job_id] = JobManager.delete_job(job_id)
+            else:
+                result_dict['success'] = False
+                result_dict['message'] = "There are no jobs for this domain."
+    else:
+        result_dict['success'], result_dict['message'] = process_failed_inputs(validated_inputs)
 
     return jsonify(result_dict)
 
