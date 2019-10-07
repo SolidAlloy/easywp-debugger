@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.2.5');
+define('VERSION', '2.2.6');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -2228,7 +2228,6 @@ function usageDisable()
 function selfDestruct()
 {
     session_destroy();
-    deleteCronAndCache();
     $files = array('wp-admin/adminer-auto.php',
                    'wp-admin/adminer.php',
                    'wp-admin/adminer.css',
@@ -2241,6 +2240,7 @@ function selfDestruct()
     wpConfigClear();
     usageDisable();
     clearAll();
+    deleteCronAndCache(); // delete the cron job to remove debugger in some time because it is not needed anymore
 }
 
 
