@@ -3,6 +3,8 @@ from functools import wraps
 
 from app import app
 from flask import jsonify
+import requests
+from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 # Regular experessions used for the validation of input.
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
@@ -84,3 +86,24 @@ def process_failed_inputs(validated_inputs):
         success = False
         message = 'The file is invalid.'
     return [success, message]
+
+
+def check_page(url):
+    try:
+        response = requests.get('http://skanzy.info/wp-admin-shared-status.php')
+    except Timeout:
+        success = False
+        message = "Timeout occurred when accessing the link."
+    except TooManyRedirects:
+        success = False
+        message = "There is a redirection loop at the link."
+    except RequestException:
+        success = False
+        message = "Unknown exception occurred when trying to access the link."
+    if response.status_code == 200:
+        success = True
+        message = response.text
+    else:
+        success = False
+        message = "The link returned " + str(response.status_code) + " status code."
+    return success, message
