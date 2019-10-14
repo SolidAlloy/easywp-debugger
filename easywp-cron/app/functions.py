@@ -7,6 +7,7 @@ from flask import jsonify
 # Regular experessions used for the validation of input.
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
 file_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9-_() ]{0,30}\.php$')
+job_file_regex = re.compile(r'file=([.a-zA-Z0-9-_() ]+?)"')
 
 
 def catch_custom_exception(func):
