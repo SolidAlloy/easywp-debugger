@@ -6,7 +6,7 @@ from app import app, db
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
 from app.functions import (catch_custom_exception, check_inputs,
-                           process_failed_inputs)
+                           process_failed_inputs, check_page)
 from app.job_manager import JobManager
 from app.models import FailedLink
 from flask import jsonify, request
@@ -251,3 +251,24 @@ def flock_bot():
     """
     json_request = request.get_json()
     return jsonify(FlockAPI.process(json_request))
+
+
+@app.route('/monitor-easywp', methods=['GET'])
+@catch_custom_exception
+def monitor_easywp():
+    shared_success, shared_message = check_page('http://skanzy.info/wp-admin-shared-status.php')
+    vps_success, vps_message = check_page('http://skanzy.info/wp-admin-vps-status.php')
+
+    if shared_success and shared_message == 'fail':
+        app.shared_logger('Status: Fail')
+    elif shared_success:
+        app.shared_logger('Status: OK')
+    else:
+        app.shared_logger('Status: Error. Message: ' + shared_message)
+
+    if vps_success and vps_message == 'fail':
+        app.vps_logger('Status: Fail')
+    elif vps_success:
+        app.vps_logger('Status: OK')
+    else:
+        app.vps_logger('Status: Error. Message: ' + vps_message)
