@@ -1,4 +1,5 @@
-from app import application, db
+from app import app as application
+from app import db
 from app.models import BotUser, FailedLink
 
 
