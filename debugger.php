@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.2.4');
+define('VERSION', '2.2.6');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -1164,16 +1164,16 @@ class CronAPI
      * @param  array  $data     Data to be sent in a POST request
      * @return mixed            string of output on success or false on fail
      */
-    protected function sendRequest($endpoint, $method, $data=null)
+    protected function sendRequest($endpoint, $method, $data)
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         if (strcasecmp($method, 'POST') == 0) {
             curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
         } elseif (strcasecmp($method, 'DELETE') == 0) {
             curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
         }
@@ -1264,7 +1264,8 @@ class CronAPI
     public function deleteCron()
     {
         $endpoint = 'delete/'.$this->domain;
-        $output = $this->sendRequest($endpoint, 'DELETE');
+        $data .= 'file='.$this->file;
+        $output = $this->sendRequest($endpoint, 'DELETE', $data);
         if ($this->analyzeRequest($output, $endpoint)) {
             return true;
         } else {
@@ -2227,7 +2228,6 @@ function usageDisable()
 function selfDestruct()
 {
     session_destroy();
-    deleteCronAndCache();
     $files = array('wp-admin/adminer-auto.php',
                    'wp-admin/adminer.php',
                    'wp-admin/adminer.css',
@@ -2240,6 +2240,7 @@ function selfDestruct()
     wpConfigClear();
     usageDisable();
     clearAll();
+    deleteCronAndCache(); // delete the cron job to remove debugger in some time because it is not needed anymore
 }
 
 
