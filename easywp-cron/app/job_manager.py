@@ -3,6 +3,7 @@ from functools import wraps
 
 from app import app, cache
 from flask import url_for
+import sys
 
 
 class JobManager:
@@ -70,7 +71,12 @@ class JobManager:
             SystemError -- Raise system error if the atq command is not
                 available.
         """
-        result = subprocess.run('atq', capture_output=True, text=True)  # Output current queue
+        if sys.version_info.minor == 7:
+            result = subprocess.run('atq', capture_output=True, text=True)  # Output current queue
+        else:
+            result = subprocess.run('atq', stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    universal_newlines=True)  # Backward compatibility
         if result.returncode != 0:
             raise SystemError('atq is broken.')
         return result.stdout
@@ -108,8 +114,15 @@ class JobManager:
         # Get only the job number for each line
         numbers = [line.split('\t', 1)[0] for line in lines]
         for number in numbers:
-            output = subprocess.run(['at', '-c', number],
-                                    capture_output=True, text=True).stdout
+            if sys.version_info.minor == 7:
+                output = subprocess.run(['at', '-c', number],
+                                        capture_output=True,
+                                        text=True).stdout  # Output current queue
+            else:
+                output = subprocess.run(['at', '-c', number],
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE,
+                                        universal_newlines=True).stdout  # Backward compatibility
             # Get content of each job until the domain is found
             if output.find(domain) != -1:
                 return number
@@ -140,7 +153,7 @@ class JobManager:
             command = ['at', 'now', '+'] + app.config["TIME_TO_DELETE"].split()
             result = subprocess.run(
                 command,
-                text=True,
+                universal_newlines=True,  # instead of text=True for backward compatibility
                 input='curl -L -X POST '
                 + '-H "Content-Type:application/x-www-form-urlencoded; charset=UTF-8" '
                 + '-d "domain=' + domain

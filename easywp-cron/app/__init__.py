@@ -13,8 +13,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_sslify import SSLify
 
 app = Flask(__name__)
-# WSGI must be provided with "application". "app" variable can't be used
-application = app
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
