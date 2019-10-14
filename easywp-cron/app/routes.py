@@ -260,15 +260,22 @@ def monitor_easywp():
     vps_success, vps_message = check_page('http://skanzy.info/wp-admin-vps-status.php')
 
     if shared_success and shared_message == 'fail':
-        app.shared_logger('Status: Fail')
+        app.shared_logger.info('Status: Fail')
+        shared_status = 'fail'
     elif shared_success:
-        app.shared_logger('Status: OK')
+        app.shared_logger.info('Status: OK')
+        shared_status = 'ok'
     else:
-        app.shared_logger('Status: Error. Message: ' + shared_message)
+        app.shared_logger.info('Status: Error. Message: ' + shared_message)
+        shared_status = 'error'
 
     if vps_success and vps_message == 'fail':
-        app.vps_logger('Status: Fail')
+        app.vps_logger.info('Status: Fail')
+        vps_status = 'fail'
     elif vps_success:
-        app.vps_logger('Status: OK')
+        app.vps_logger.info('Status: OK')
+        vps_status = 'ok'
     else:
-        app.vps_logger('Status: Error. Message: ' + vps_message)
+        app.vps_logger.info('Status: Error. Message: ' + vps_message)
+        vps_status = 'error'
+    return jsonify({'shared status': shared_status, 'vps_status': vps_status})
