@@ -91,6 +91,12 @@ def process_failed_inputs(validated_inputs):
 def check_page(url):
     try:
         response = requests.get('http://skanzy.info/wp-admin-shared-status.php')
+        if response.status_code == 200:
+            success = True
+            message = response.text
+        else:
+            success = False
+            message = "The link returned " + str(response.status_code) + " status code."
     except Timeout:
         success = False
         message = "Timeout occurred when accessing the link."
@@ -100,10 +106,4 @@ def check_page(url):
     except RequestException:
         success = False
         message = "Unknown exception occurred when trying to access the link."
-    if response.status_code == 200:
-        success = True
-        message = response.text
-    else:
-        success = False
-        message = "The link returned " + str(response.status_code) + " status code."
     return success, message

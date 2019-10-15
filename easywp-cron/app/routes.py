@@ -74,6 +74,21 @@ def analyze():
                                         'selfDestruct': '1',
                                         'silent': '1',
                                     })
+            if response.status_code == 200:
+                if response.json() == {'success': True}:
+                    success = True
+                    message = "The file was removed successfully."
+                else:
+                    success = False
+                    error = 'no output'
+                    message = "Link responded with 200 but didn't return any JSON."
+            elif response.status_code == 404:
+                success = True
+                message = "The file has already been removed."
+            else:
+                success = False
+                error = str(response.status_code)
+                message = "The link returned " + error + " status code."
         except Timeout:
             success = False
             error = 'timeout'
@@ -86,21 +101,6 @@ def analyze():
             success = False
             error = 'unknown'
             message = "Unknown exception occurred when trying to access the link."
-        if response.status_code == 200:
-            if response.json() == {'success': True}:
-                success = True
-                message = "The file was removed successfully."
-            else:
-                success = False
-                error = 'no output'
-                message = "Link responded with 200 but didn't return any JSON."
-        elif response.status_code == 404:
-            success = True
-            message = "The file has already been removed."
-        else:
-            success = False
-            error = str(response.status_code)
-            message = "The link returned " + error + " status code."
     else:  # if no domain or the domain wasn't validated against the regex
         success, message = process_failed_inputs(validated_inputs)
 

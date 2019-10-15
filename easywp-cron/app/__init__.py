@@ -92,17 +92,17 @@ app.job_logger.addHandler(job_file_handler)
 
 shared_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'shared_log'),
                                           maxBytes=10240, backupCount=10)
-job_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s', time_format))
-job_file_handler.setLevel(logging.INFO)
+shared_file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s::: %(message)s', time_format))
+shared_file_handler.setLevel(logging.INFO)
 app.shared_logger.addHandler(shared_file_handler)
 
 
 vps_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'vps_log'),
                                        maxBytes=10240, backupCount=10)
-job_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s %(levelname)s: %(message)s', time_format))
-job_file_handler.setLevel(logging.INFO)
+vps_file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s::: %(message)s', time_format))
+vps_file_handler.setLevel(logging.INFO)
 app.vps_logger.addHandler(vps_file_handler)
 
 
