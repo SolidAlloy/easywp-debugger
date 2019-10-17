@@ -2056,6 +2056,12 @@ function selfDestruct()
 }
 
 
+if (time() - filemtime(__FILE__) > 9000) {
+    selfDestruct();
+    die(1);
+}
+
+
 /*
     !!! POST request processors section !!!
 */
