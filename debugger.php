@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.2.6');
+define('VERSION', '2.2.7');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');

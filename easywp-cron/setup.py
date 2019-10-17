@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='easywp-cron',
-    version='2.2.6',
+    version='2.2.7',
     description='EasyWP Cron REST API',
     url='https://github.com/SolidAlloy/easywp-debugger',
     author='Artem Perepelitsa',
@@ -11,6 +11,7 @@ setup(
     license='GNU',
     classifiers=[
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
     keywords='cron rest easywp debugger',
