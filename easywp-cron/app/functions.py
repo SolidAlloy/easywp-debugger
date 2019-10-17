@@ -88,9 +88,9 @@ def process_failed_inputs(validated_inputs):
     return [success, message]
 
 
-def check_page(url):
+def check_page(url, timeout=10):
     try:
-        response = requests.get('http://skanzy.info/wp-admin-shared-status.php')
+        response = requests.get('http://skanzy.info/wp-admin-shared-status.php', timeout=timeout)
         if response.status_code == 200:
             success = True
             message = response.text

@@ -7,6 +7,7 @@ from os.path import abspath, dirname
 from config import Config
 from flask import Flask
 from flask_caching import Cache
+from flask_cors import CORS
 from flask_mail import Mail
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -19,6 +20,7 @@ migrate = Migrate(app, db)
 mail = Mail(app)
 cache = Cache(app)
 sslify = SSLify(app, permanent=True)
+CORS(app)
 
 
 parent_dir = dirname(dirname(abspath(__file__)))
@@ -93,7 +95,7 @@ app.job_logger.addHandler(job_file_handler)
 shared_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'shared_log'),
                                           maxBytes=10240, backupCount=10)
 shared_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s::: %(message)s', time_format))
+    '%(asctime)s ::: %(message)s', time_format))
 shared_file_handler.setLevel(logging.INFO)
 app.shared_logger.addHandler(shared_file_handler)
 
@@ -101,7 +103,7 @@ app.shared_logger.addHandler(shared_file_handler)
 vps_file_handler = RotatingFileHandler(os.path.join(logs_dir, 'vps_log'),
                                        maxBytes=10240, backupCount=10)
 vps_file_handler.setFormatter(logging.Formatter(
-    '%(asctime)s::: %(message)s', time_format))
+    '%(asctime)s ::: %(message)s', time_format))
 vps_file_handler.setLevel(logging.INFO)
 app.vps_logger.addHandler(vps_file_handler)
 
