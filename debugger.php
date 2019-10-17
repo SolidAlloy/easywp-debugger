@@ -559,14 +559,7 @@ class EasyWP_Cache
     protected function getNeededKeys()
     {
         $keysDict = [];
-        $cronKeys = $this->keys('*:cronCreateSent');
         $loginKeys = $this->keys('*~login:*');
-        foreach ($cronKeys as $key) {
-            $keysDict[$key] = [
-                $this->fetch($key),
-                $this->ttl($key),
-            ];
-        }
         foreach ($loginKeys as $key) {
             $keysDict[$key] = [
                 $this->fetch($key),
@@ -1112,172 +1105,32 @@ class DirZipArchive
     }
 }
 
-/**
- * CronAPI allows to communicate with EasyWP Cron through REST API easily
- */
-class CronAPI
-{
-    /**
-     * Time to wait for the response
-     * @var integer
-     */
-    protected $timeout = 30;
-
-    /**
-     * Domain to which debugger was uploaded
-     * @var string
-     */
-    protected $domain;
-
-    /**
-     * Name of the debugger file (wp-admin-debugger.php or debugger.php by default)
-     * @var string
-     */
-    protected $file;
-
-    public function __construct()
-    {
-        $this->domain = $_SERVER['HTTP_HOST'];
-        $this->file = basename(__FILE__);
-    }
-
-    /**
-     * Sends an email from the default server mailbox to a recipient defined at the start of the file
-     *
-     * @param  string $emailBody Body of the email
-     * @param  string $endpoint  Endpoint of the easywp-cron API
-     * @return null
-     */
-    protected function sendMail($emailBody, $endpoint)
-    {
-        $subject = 'Debugger: error accessing endpoint /'.$endpoint;
-        $emailBody = "Reporter: ".$this->domain.'/'.$this->file."\n".$emailBody;
-        $headers = "X-Mailer: PHP/".phpversion();
-        mail(MAIL_RECIPIENT, $subject, $emailBody, $headers);
-    }
-
-    /**
-     * Sends a request to the API endpoint and returns output or false on fail
-     *
-     * @param  string $endpoint Endpoint of the API
-     * @param  string $method   HTTP method to use
-     * @param  array  $data     Data to be sent in a POST request
-     * @return mixed            string of output on success or false on fail
-     */
-    protected function sendRequest($endpoint, $method, $data)
-    {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'https://cron.nctool.me/'.$endpoint);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['charset=UTF-8']);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        if (strcasecmp($method, 'POST') == 0) {
-            curl_setopt($ch, CURLOPT_POST, 1);
-        } elseif (strcasecmp($method, 'DELETE') == 0) {
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
-        }
-
-        $result = curl_exec($ch);
-
-        if(curl_errno($ch)) {
-            $emailBody .= "Curl Error when trying to access /".$endpoint."\n";
-            $emailBody .= "Error: ".curl_error($ch)."\n";
-            $this->sendMail($emailBody, $endpoint);
-            curl_close($ch);
-            return false;
-        }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        if ($httpCode == 200) {
-            curl_close($ch);
-            return $result;
-        } else {
-            $emailBody .= "Invalid status code when trying to access /".$endpoint."\n";
-            $emailBody .= "Status Code: ".$httpCode."\n";
-            $this->sendMail($emailBody, $endpoint);
-            curl_close($ch);
-            return false;
-        }
-    }
-
-    /**
-     * Analyzes if the request failed and sends corresponding emails
-     *
-     * @param  string   $output   String of output or false
-     * @param  string   $endpoint Endpoint of the API
-     * @return boolean            Success of the request
-     */
-    protected function analyzeRequest($output, $endpoint)
-    {
-        $result = false;
-        if ($output) {
-            $jsonData = json_decode($output);
-            if ($jsonData) {
-                // do not report "Job is already created." as it doesn't mean any failures on the side of debugger or easywp-cron
-                if ($jsonData->success == true || $jsonData->message == 'Job is already created.') {
-                    $result = true;
-                } else {
-                    $emailBody  = "Request to /".$endpoint." failed.\n";
-                    $emailBody .= "Reason: ".$jsonData->message."\n";
-                }
-            } else {
-                $emailBody  = "The output returned from /".$endpoint." is not JSON.\n";
-                $emailBody .= "Output: ".$output."\n";
-            }
-        } elseif ($output !== false) {  // if output is empty but not false
-            $emailBody .= "Status code was 200 but no output was returned when trying to access /".$endpoint."\n";
-        } else {  // if output is false, the corresponding email was sent by sendRequest, so no need to send another one
-            return false;
-        }
-        if ($result) {
-            return true;
-        } else {
-            $this->sendMail($emailBody, $endpoint);
-            return false;
-        }
-    }
-
-    /**
-     * Creates a cron that will delete debugger in 2 hours
-     *
-     * @return boolean Success of the cron creation
-     */
-    public function createCron()
-    {
-        $endpoint = 'create';
-        $data  = 'domain='.$this->domain;
-        $data .= '&file='.$this->file;
-        $output = $this->sendRequest($endpoint, 'POST', $data);
-        if ($this->analyzeRequest($output, $endpoint)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Deletes the cron, so it will not be executed
-     *
-     * @return boolean Success of the deletion
-     */
-    public function deleteCron()
-    {
-        $endpoint = 'delete/'.$this->domain;
-        $data .= 'file='.$this->file;
-        $output = $this->sendRequest($endpoint, 'DELETE', $data);
-        if ($this->analyzeRequest($output, $endpoint)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-}
-
 
 /*
     !!! PHP functions section !!!
 */
+
+
+/**
+ * Sends an email from the default server mailbox to a recipient defined at the start of the file
+ *
+ * @param  string $emailBody Body of the email
+ * @param  string $endpoint  Endpoint of the easywp-cron API
+ * @return null
+ */
+function sendMail($emailBody, $endpoint)
+{
+    $domain = $_SERVER['HTTP_HOST'];
+    $file = basename(__FILE__);
+    $subject = 'Debugger: error accessing endpoint /'.$endpoint;
+    $emailBody = "Reporter: ".$domain.'/'.$file."\n".$emailBody;
+    $headers = "X-Mailer: PHP/".phpversion();
+    if (mail(MAIL_RECIPIENT, $subject, $emailBody, $headers)) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 
 function authorized()
@@ -2057,7 +1910,7 @@ function deactivatePlugin($pluginPath)
  * @param  string $pluginFolder Name of the plugin folder
  * @return bool                 Success of the removal
  */
-function DeletePlugin($pluginFolder)
+function deletePlugin($pluginFolder)
 {
     $failedRemovals = rrmdir('wp-content/plugins/'.$pluginFolder);
     if ($failedRemovals) {
@@ -2098,54 +1951,12 @@ function login($password)
         $cache->store($blockedKey, $blocked+1, 86400);  // store number of times blocked for 24 hours
         return false;
     } else {
-        $cache->delete($apcuKey);
+        $cache->delete($failedLoginKey);
         $cache->delete($blockedKey);
         return true;
     }
 }
 
-/**
- * send the cron creation request and return its result.
- * @return string Success of the request or 'alreadySent' in case the request was already sent.
- */
-function createCron()
-{
-    try {
-        $cache = new EasyWP_Cache();
-        $cronKey = basename(__FILE__).':cronCreateSent';
-        $cronCreateSent = $cache->fetch($cronKey);
-        if ($cronCreateSent) {
-            $status = 'alreadySent';
-        } else {  // send the cron if it wasn't sent before
-            $cronAPI = new CronAPI();
-            $status = $cronAPI->createCron() ? 'ok' : 'fail';
-            $cache->store($cronKey, 1, 2460);  // store a reminder that the createCron request was sent for 2 hours and 1 minute to allow cron API some time to delete debugger
-        }
-    } catch (Exception $e) {
-        $cronAPI = new CronAPI();  // since cache isn't supported here, send createCron request without checking in cache whether it was already sent
-        $status = $cronAPI->createCron() ? 'ok' : 'fail';
-    }
-    return $status;
-}
-
-/**
- * Deletes the easywp cron and removes its reference from the cache
- * @return null
- */
-function deleteCronAndCache()
-{
-    if (!isset($_GET['silent'])) {  // if silent is set, don't try to delete cron as the removal request is already sent by EasyWP Cron.
-        $cronAPI = new CronAPI();
-        $cronAPI->deleteCron();
-    }
-
-    try {
-        $cache = new EasyWP_Cache();
-        $cache->delete(basename(__FILE__).':cronCreateSent');
-    } catch (Exception $e) {
-        // do nothing
-    }
-}
 
 /**
  * Installs and activates the UsageDD plugin
@@ -2196,7 +2007,7 @@ function usageDisable()
         require_once('wp-admin/includes/file.php');
         require_once('wp-admin/includes/plugin.php');
         if (deactivatePlugin('usagedd/usagedd.php')) {
-            if (DeletePlugin('usagedd')) {
+            if (deletePlugin('usagedd')) {
                 $success = true;
                 $error = '';
             } else {
@@ -2233,14 +2044,15 @@ function selfDestruct()
                    'wp-admin/adminer.css',
                     __FILE__);
     foreach($files as $file) {
-        unlink($file);
+        if (file_exists($file)) {
+            unlink($file);
+        }
     }
 
     // disable debug, remove UsageDD, and clear cache silently because if it fails, nothing else can be done anyway
     wpConfigClear();
     usageDisable();
     clearAll();
-    deleteCronAndCache(); // delete the cron job to remove debugger in some time because it is not needed anymore
 }
 
 
@@ -2268,9 +2080,9 @@ if (isset($_POST['login'])) {
     )));
 }
 
-if (isset($_POST['createCron'])) {
+if (isset($_POST['cronReport'])) {
     die(json_encode(array(
-        'status' => createCron(),
+        'status' => sendMail($_POST['message'], $_POST['endpoint']),
     )));
 }
 
@@ -2759,6 +2571,99 @@ var transferActiveTab = function() {
     $('.'+$activeTab.attr('aria-labelledby')).addClass('active');  // make menu item responsible for this tab active
 };
 
+
+var getSelfFilename = function() {
+    var pathname = window.location.pathname;
+    var filename = pathname.substring(pathname.lastIndexOf('/')+1);
+    return filename;
+};
+
+
+var sendCronReport = function(message, endpoint) {
+    $.ajax({
+        timeout: 10000,
+        type: "POST",
+        data: {
+            cronReport: 'submit',
+            message: message,
+            endpoint: endpoint,
+        }
+    })
+    .done(function(response) {
+        console.log('Cron Report request was successful.');
+    })
+    .fail(function( jqXHR, exception ) {
+        console.log('Cron Report request failed.');
+    });
+};
+
+
+var sendCronRequest = function(endpoint) {
+    var url;
+    var postData;
+    var method;
+    var msg = '';
+
+    if (endpoint == 'create') {
+        url = 'https://cron.nctool.me/create';
+        method = 'POST';
+        postData = {
+            'domain': window.location.hostname,
+            'file': getSelfFilename(),
+        };
+    } else if (endpoint == 'delete') {
+        url = 'https://cron.nctool.me/delete/'+window.location.hostname;
+        method = 'DELETE';
+        postData = {
+            'file': getSelfFilename(),
+        };
+    } else {
+        throw "Unknown endpoint for sendCronRequest()";
+    }
+
+    $.ajax({
+        timeout: 15000,
+        url: url,
+        type: method,
+        data: postData,
+    })
+    .done(function(jsonData) {
+        if ($.trim(jsonData)) {
+            if (jsonData.success == true || jsonData.message == 'Job is already created.') {
+                // everything is ok, nothing to report
+            } else {
+                msg = 'Request to /create failed.\nReason: '+jsonData.message+'\n';
+            }
+        } else {
+            msg = 'Status code was 200 but no output was returned when trying to access /create';
+        }
+        if (msg) {
+            sendCronReport(msg, endpoint);
+        }
+    })
+    .fail(function( jqXHR, exception ) {
+        if (jqXHR.status === 0) {
+            errMsg = 'Failed To Connect. Network Error.';
+        } else if (jqXHR.status == 503) {
+            errMsg = 'Service Unavailable. [503]';
+        } else if (jqXHR.status == 404) {
+            errMsg = 'Requested page not found. [404]';
+        } else if (jqXHR.status == 500) {
+            errMsg = 'Internal Server Error [500].';
+        } else if (exception === 'parsererror') {
+            errMsg = 'Requested JSON parse failed.';
+        } else if (exception === 'timeout') {
+            errMsg = 'Time out error.';
+        } else if (exception === 'abort') {
+            errMsg = 'Ajax request aborted.';
+        } else {
+            errMsg = 'Uncaught Error.\n' + jqXHR.responseText;
+        }
+        msg = 'Error when trying to access /create\nError: '+errMsg+'\n';
+        sendCronReport(msg, endpoint);
+    });
+};
+
 </script>
 <?php if (authorized()): ?>
 <script>
@@ -3188,7 +3093,7 @@ var sendSelfDestructRequest = function() {
         timeout: 20000,
         data: {selfDestruct: 'submit'},
         beforeSend: function() {
-            // show a success message before receiving the callback because file removal can't be unsuccessful but can take a lot of time (especially communicating with easywp-cron)
+            sendCronRequest('delete');
             printMsg('debugger.php Deleted Successfully!', true, 'success-progress');
         },
         success: function(response) {
@@ -3911,89 +3816,6 @@ $(document).ready(function() {
 <?php else: ?>
 <script>
 
-/**
- * Send a request to create cron on the remote server (to remove debugger in some time)
- */
-var sendCreateCronRequest = function() {
-    $.ajax({
-        type: "POST",
-        data: {createCron: 'submit'},
-        timeout: 40000,
-    })
-    .done(function( response ) {
-        var jsonData;
-        try {
-            jsonData = JSON.parse(response);
-        } catch (e) {
-            console.log(
-                '%c createCron Request: %c The returned value is not JSON.',
-                'font-weight: bold;',
-                'color: red; font-weight: normal;'
-            );
-            return;
-        }
-
-        if (!$.trim(jsonData)){
-            console.log(
-                '%c createCron Request: %c Empty response was returned from the AJAX request.',
-                'font-weight: bold;',
-                'color: red; font-weight: normal;'
-            );
-        }
-
-        if (jsonData.status == 'ok') {
-            console.log(
-                '%c createCron Request: %c The cron was created successfully.',
-                'font-weight: bold;',
-                'color: green; font-weight: normal;'
-            );
-        } else if (jsonData.status == 'alreadySent') {
-            console.log(
-                '%c createCron Request: %c The cron create request is already sent.',
-                'font-weight: bold;',
-                'color: orange; font-weight: normal;'
-            );
-        } else {
-            console.log(
-                '%c createCron Request: %c The cron creation failed.',
-                'font-weight: bold;',
-                'color: red; font-weight: normal;'
-            );
-        }
-    })
-    .fail(function( jqXHR, exception ) {
-        if (jqXHR.status === 0) {
-            msg = 'Failed To Connect. Network Error.';
-        } else if (jqXHR.status == 503) {
-            msg = 'Service Unavailable. [503]';
-        } else if (jqXHR.status == 404) {
-            msg = 'Requested page not found. [404]';
-        } else if (jqXHR.status == 500) {
-            msg = 'Internal Server Error [500].';
-        } else if (exception === 'parsererror') {
-            msg = 'Requested JSON parse failed.';
-        } else if (exception === 'timeout') {
-            msg = 'Time out error.';
-        } else if (exception === 'abort') {
-            msg = 'Ajax request aborted.';
-        } else {
-            msg = 'Uncaught Error.\n' + jqXHR.responseText;
-        }
-        if (msg == 'Failed To Connect. Network Error.') {
-            console.log(
-                '%c createCron Request: %c Not possible to determine success of the request as the page was reloaded.',
-                'font-weight: bold;',
-                'color: yellow; font-weight: normal;'
-            );
-        }
-        console.log(
-            '%c createCron Request: %c ' + msg,
-            'font-weight: bold;',
-            'color: red; font-weight: normal;'
-        );
-    });
-};
-
 
 var processLoginform = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Logging in...';
@@ -4002,7 +3824,11 @@ var processLoginform = function(form) {
     form.preventDefault();
     $button.prop("disabled", true);
     $button.html(loadingText);
-    sendCreateCronRequest();
+
+    var cronSuccess;
+    var cronMessage = '';
+    sendCronRequest('create');
+
     $('#password-invalid').removeClass('show').addClass('d-none');
     var password = $("#login-form :input[name='password']")[0].value;
     if (handleEmptyField(password)) {

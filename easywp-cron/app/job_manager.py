@@ -75,7 +75,7 @@ class JobManager:
             SystemError -- Raise system error if the atq command is not
                 available.
         """
-        if sys.version_info.minor == 7:
+        if sys.version_info.minor >= 7:
             result = subprocess.run('atq', capture_output=True, text=True)  # Output current queue
         else:
             result = subprocess.run('atq', stdout=subprocess.PIPE,
@@ -119,7 +119,7 @@ class JobManager:
         # Get only the job number for each line
         numbers = [line.split('\t', 1)[0] for line in lines]
         for number in numbers:
-            if sys.version_info.minor == 7:
+            if sys.version_info.minor >= 7:
                 output = subprocess.run(['at', '-c', number],
                                         capture_output=True,
                                         text=True).stdout  # Output current queue
@@ -139,8 +139,14 @@ class JobManager:
 
     @log_job
     def find_file_in_job(job_id):
-        output = subprocess.run(['at', '-c', str(job_id)],
-                                capture_output=True, text=True).stdout
+        if sys.version_info.minor >= 7:
+            output = subprocess.run(['at', '-c', str(job_id)],
+                                    capture_output=True, text=True).stdout
+        else:
+            output = subprocess.run(['at', '-c', str(job_id)],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    universal_newlines=True).stdout  # Backward compatibility
         result = job_file_regex.search(output)
         if result:
             return result[1]  # first group of the search result

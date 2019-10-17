@@ -105,7 +105,10 @@ def analyze():
         success, message = process_failed_inputs(validated_inputs)
 
     if not success:
-        link_without_query = response.url.split('?')[0]
+        try:
+            link_without_query = response.url.split('?')[0]
+        except UnboundLocalError:  # response variable was not defined because of exception
+            link_without_query = 'http://' + domain + '' + file
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'email':
             failed_link = FailedLink(
@@ -116,7 +119,7 @@ def analyze():
                 app.config['FAILED_URL_HANDLER'] == 'bot':
             flock_message = "I failed to remove the following debugger file: " +\
                       link_without_query + "<br/>" + message +\
-                      "<br/>Please make sure the file is removed."
+                      "<br/>Please make sure the file is removed and like this message."
             FlockAPI.send_message(flock_message, color='#FF0000')
 
     response = {
@@ -256,26 +259,42 @@ def flock_bot():
 @app.route('/monitor-easywp', methods=['GET'])
 @catch_custom_exception
 def monitor_easywp():
-    shared_success, shared_message = check_page('http://skanzy.info/wp-admin-shared-status.php')
-    vps_success, vps_message = check_page('http://skanzy.info/wp-admin-vps-status.php')
+    host_type = request.args.get('host-type')
+    if host_type == 'shared':
+        success, message = check_page('http://skanzy.info/wp-admin-shared-status.php')
 
-    if shared_success and shared_message == 'fail':
-        app.shared_logger.info('Status: Fail')
-        shared_status = 'fail'
-    elif shared_success:
-        app.shared_logger.info('Status: OK')
-        shared_status = 'ok'
+    elif host_type == 'vps':
+        success, message = check_page('http://skanzy.info/wp-admin-vps-status.php')
     else:
-        app.shared_logger.info('Status: Error. Message: ' + shared_message)
-        shared_status = 'error'
+        shared_success, shared_message = check_page('http://skanzy.info/wp-admin-shared-status.php')
+        vps_success, vps_message = check_page('http://skanzy.info/wp-admin-vps-status.php')
 
-    if vps_success and vps_message == 'fail':
-        app.vps_logger.info('Status: Fail')
-        vps_status = 'fail'
-    elif vps_success:
-        app.vps_logger.info('Status: OK')
-        vps_status = 'ok'
+    if host_type:
+        if success and message == 'fail':
+            status = 'fail'
+        elif success:
+            status = 'ok'
+        else:
+            status = 'error'
+        return jsonify({'status': status})
     else:
-        app.vps_logger.info('Status: Error. Message: ' + vps_message)
-        vps_status = 'error'
-    return jsonify({'shared status': shared_status, 'vps_status': vps_status})
+        if shared_success and shared_message == 'fail':
+            app.shared_logger.info('Status: Fail')
+            shared_status = 'fail'
+        elif shared_success:
+            app.shared_logger.info('Status: OK')
+            shared_status = 'ok'
+        else:
+            app.shared_logger.info('Status: Error. Message: ' + shared_message)
+            shared_status = 'error'
+
+        if vps_success and vps_message == 'fail':
+            app.vps_logger.info('Status: Fail')
+            vps_status = 'fail'
+        elif vps_success:
+            app.vps_logger.info('Status: OK')
+            vps_status = 'ok'
+        else:
+            app.vps_logger.info('Status: Error. Message: ' + vps_message)
+            vps_status = 'error'
+        return jsonify({'shared status': shared_status, 'vps_status': vps_status})
