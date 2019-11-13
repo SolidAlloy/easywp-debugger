@@ -1,10 +1,10 @@
 import subprocess
+import sys
 from functools import wraps
 
 from app import app, cache
-from app.functions import job_file_regex
+from app.functions import job_path_regex
 from flask import url_for
-import sys
 
 
 class JobManager:
@@ -102,7 +102,7 @@ class JobManager:
         return len(lines)
 
     @log_job
-    def find_jobs(domain, file=None):
+    def find_jobs(domain, path=None):
         """Find a job ID by domain.
 
         Arguments:
@@ -129,8 +129,8 @@ class JobManager:
                                         stderr=subprocess.PIPE,
                                         universal_newlines=True).stdout  # Backward compatibility
             # Get content of each job until the domain is found
-            if file:
-                if output.find(domain) != -1 and output.find(file) != -1:
+            if path:
+                if output.find(domain) != -1 and output.find(path) != -1:
                     result_numbers.append(number)
             else:
                 if output.find(domain) != -1:
@@ -138,7 +138,7 @@ class JobManager:
         return result_numbers
 
     @log_job
-    def find_file_in_job(job_id):
+    def find_path_in_job(job_id):
         if sys.version_info.minor >= 7:
             output = subprocess.run(['at', '-c', str(job_id)],
                                     capture_output=True, text=True).stdout
@@ -147,25 +147,26 @@ class JobManager:
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE,
                                     universal_newlines=True).stdout  # Backward compatibility
-        result = job_file_regex.search(output)
+        result = job_path_regex.search(output)
         if result:
-            return result[1]  # first group of the search result
+            return [True, result[1]]  # first group of the search result
         else:
-            return False
+            return [False, 'Path was not found in the job #'+job_id+'.']
 
     @log_job
-    def add_job(domain, file):
+    def add_job(domain, path):
         """Add a job to the atq queue.
 
         Add a job that will trigger the /analyze endpoint of the
-            application, supplying it with the domain and file to delete.
+            application, supplying it with the domain and path to the
+            file that should be deleted.
 
         Arguments:
             domain {str} -- Domain where the debugger file is located.
-            file {str} -- Name of the file to remove.
+            path {str} -- Name of the file (including subfolders) to remove.
         """
         try:
-            jobs_in_queue = JobManager.find_jobs(domain, file)
+            jobs_in_queue = JobManager.find_jobs(domain, path)
         except SystemError:
             return [False, '"atq" doesn\'t work on the server.']
 
@@ -181,8 +182,7 @@ class JobManager:
                 universal_newlines=True,  # instead of text=True for backward compatibility
                 input='curl -L -X POST '
                 + '-H "Content-Type:application/x-www-form-urlencoded; charset=UTF-8" '
-                + '-d "domain=' + domain
-                + '&file=' + file + '" '
+                + '-d "domain=' + domain + '&path=' + path + '" '
                 + url_for('analyze', _external=True) +
                 ' >/dev/null 2>&1'
             )

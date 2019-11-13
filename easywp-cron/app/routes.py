@@ -6,7 +6,7 @@ from app import app, db
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
 from app.functions import (catch_custom_exception, check_inputs,
-                           process_failed_inputs, check_page)
+                           process_failed_inputs)
 from app.job_manager import JobManager
 from app.models import FailedLink
 from flask import jsonify, request
@@ -34,13 +34,20 @@ def create():
             and additional message.
     """
     domain = request.form['domain']
-    file = request.form['file']
-    validated_inputs = check_inputs({'domain': domain, 'file': file})
+
+    if 'path' in request.form:
+        path = request.form['path']  # replacement of the file field
+    elif 'file' in request.form:
+        path = '/' + request.form['file']  # legacy field
+    else:
+        path = None
+
+    validated_inputs = check_inputs({'domain': domain, 'path': path})
     if all(x is True for x in validated_inputs.values()):
         # If a job with this domain is not created yet, create a new one.
         # The new job will access domain.com?selfDesctruct in two hours
         # and will analyze output from it.
-        success, message = JobManager.add_job(domain, file)
+        success, message = JobManager.add_job(domain, path)
     else:
         success, message = process_failed_inputs(validated_inputs)
 
@@ -64,12 +71,12 @@ def analyze():
             short description of the error and an additional message.
     """
     domain = request.form['domain']
-    file = request.form['file']
-    validated_inputs = check_inputs({'domain': domain, 'file': file})
+    path = request.form['path']
+    validated_inputs = check_inputs({'domain': domain, 'path': path})
     error = False
     if all(x is True for x in validated_inputs.values()):
         try:
-            response = requests.get('http://' + domain + '/' + file,
+            response = requests.get('http://' + domain + '/' + path,
                                     params={
                                         'selfDestruct': '1',
                                         'silent': '1',
@@ -108,7 +115,7 @@ def analyze():
         try:
             link_without_query = response.url.split('?')[0]
         except UnboundLocalError:  # response variable was not defined because of exception
-            link_without_query = 'http://' + domain + '' + file
+            link_without_query = 'http://' + domain + path
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'email':
             failed_link = FailedLink(
@@ -148,31 +155,34 @@ def delete(domain):
             and an additional message.
     """
     result_dict = {}
-    if 'file' in request.form:
-        file = request.form['file']
+    if 'path' in request.form:
+        path = request.form['path']
+    elif 'file' in request.form:
+        path = '/' + request.form['file']  # paths must start with slash
     else:
-        file = None
-    if file:
-        validated_inputs = check_inputs({'domain': domain, 'file': file})
+        path = None
+
+    if path:
+        validated_inputs = check_inputs({'domain': domain, 'path': path})
     else:
         validated_inputs = check_inputs({'domain': domain})
 
     if all(x is True for x in validated_inputs.values()):
-        if file:
-            job_ids = JobManager.find_jobs(domain, file)
+        if path:
+            job_ids = JobManager.find_jobs(domain, path)
             if job_ids:
                 job_id = job_ids[0]
                 result_dict['success'], result_dict['message'] = JobManager.delete_job(job_id)
             else:
                 result_dict['success'] = False
-                result_dict['message'] = "There are no jobs for these domain and file."
+                result_dict['message'] = "There are no jobs for these domain and path."
         else:
             job_ids = JobManager.find_jobs(domain)
             if job_ids:
                 for job_id in job_ids:  # remove all debugger files for this domain
-                    file = JobManager.find_file_in_job(job_id)
-                    if file:
-                        result_dict[file] = JobManager.delete_job(job_id)
+                    path_found, path = JobManager.find_path_in_job(job_id)
+                    if path_found:
+                        result_dict[path] = JobManager.delete_job(job_id)
                     else:
                         result_dict[job_id] = JobManager.delete_job(job_id)
             else:
@@ -221,7 +231,13 @@ def report_failed_links():
 @app.route('/delete-old-records', methods=['DELETE'])
 @catch_custom_exception
 def delete_old_records():
-    """Delete database records older than month.
+    """Delete database records older than a month.
+
+    Delete database records older than a month. This endpoint is created
+    to clear up the database and keep it small. It is only needed if
+    FAILED_URL_HANDLER is set to "all" or "email". Add it to cron jobs
+    as a "wget domain.com/delete-old-records" and run once a month to
+    clear old database records.
 
     Decorators:
         app.route
@@ -254,47 +270,3 @@ def flock_bot():
     """
     json_request = request.get_json()
     return jsonify(FlockAPI.process(json_request))
-
-
-@app.route('/monitor-easywp', methods=['GET'])
-@catch_custom_exception
-def monitor_easywp():
-    host_type = request.args.get('host-type')
-    if host_type == 'shared':
-        success, message = check_page('http://skanzy.info/wp-admin-shared-status.php')
-
-    elif host_type == 'vps':
-        success, message = check_page('http://skanzy.info/wp-admin-vps-status.php')
-    else:
-        shared_success, shared_message = check_page('http://skanzy.info/wp-admin-shared-status.php')
-        vps_success, vps_message = check_page('http://skanzy.info/wp-admin-vps-status.php')
-
-    if host_type:
-        if success and message == 'fail':
-            status = 'fail'
-        elif success:
-            status = 'ok'
-        else:
-            status = 'error'
-        return jsonify({'status': status})
-    else:
-        if shared_success and shared_message == 'fail':
-            app.shared_logger.info('Status: Fail')
-            shared_status = 'fail'
-        elif shared_success:
-            app.shared_logger.info('Status: OK')
-            shared_status = 'ok'
-        else:
-            app.shared_logger.info('Status: Error. Message: ' + shared_message)
-            shared_status = 'error'
-
-        if vps_success and vps_message == 'fail':
-            app.vps_logger.info('Status: Fail')
-            vps_status = 'fail'
-        elif vps_success:
-            app.vps_logger.info('Status: OK')
-            vps_status = 'ok'
-        else:
-            app.vps_logger.info('Status: Error. Message: ' + vps_message)
-            vps_status = 'error'
-        return jsonify({'shared status': shared_status, 'vps_status': vps_status})
