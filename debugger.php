@@ -59,6 +59,14 @@ define('FILES', 'files.txt');
 // send error reports regarding easywp-cron failures to the following addresses
 define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, perepelartem@gmail.com');
 
+// find the website root directory if debugger is uploaded to wp-admin
+$curDir = dirname(__FILE__);
+if (basename($curDir) == 'wp-admin') {
+    define('WEB_ROOT', dirname($curDir).'/');
+} else {
+    define('WEB_ROOT', $curDir.'/');
+}
+
 
 /*
     !!! PHP classes section !!!
@@ -236,12 +244,12 @@ class Redis_Object_Cache
                 // Load bundled Predis library
                 if (!class_exists('Predis\Client')) {
                     // Restore symlink if it is broken
-                    $plugin_dir = 'wp-content/mu-plugins';
+                    $plugin_dir = WEB_ROOT.'wp-content/mu-plugins';
                     if (file_exists('/var/www/wptbox/wp-content/mu-plugins')
                         && is_link('/var/www/wptbox/wp-content/mu-plugins')) {
                             // pass
                     } else {
-                        $target_pointer = "../../easywp-plugin/mu-plugins";
+                        $target_pointer = WEB_ROOT."../../easywp-plugin/mu-plugins";
                         $link_name = '/var/www/wptbox/wp-content/mu-plugins';
                         symlink($target_pointer, $link_name);
                     }
@@ -728,7 +736,7 @@ class DBconn {
                               'prefix' => '' ,
                            );
 
-        $wp_config = fopen('wp-config.php', 'r');
+        $wp_config = fopen(WEB_ROOT.'wp-config.php', 'r');
         if (!$wp_config) {
             array_push($this->errors, "Failed to open wp-config.php");
             return array();
@@ -1202,14 +1210,14 @@ function clearAll()
  */
 function wpConfigClear()
 {
-    $wp_config = "wp-config.php";
+    $wp_config = WEB_ROOT."wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
     }
     $config = file_get_contents($wp_config);
-    $config = str_replace("define('WP_DEBUG', true);", '', $config);
-    $config = str_replace("define('WP_DEBUG_DISPLAY', true);", '', $config);
-    $config = str_replace("@ini_set('display_errors', 1);", '', $config);
+    $config = str_replace("define('WP_DEBUG', true);\n", '', $config);
+    $config = str_replace("define('WP_DEBUG_DISPLAY', true);\n", '', $config);
+    $config = str_replace("@ini_set('display_errors', 1);\n", '', $config);
     file_put_contents($wp_config, $config);
     return true;
 }
@@ -1220,12 +1228,12 @@ function wpConfigClear()
  */
 function wpConfigPut()
 {
-    $wp_config = "wp-config.php";
+    $wp_config = WEB_ROOT."wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
     }
     $config = file_get_contents($wp_config);
-    $config = preg_replace("/\/\* That's all, stop editing! Happy blogging\. \*\//i", "define('WP_DEBUG', true);\ndefine('WP_DEBUG_DISPLAY', true);\n@ini_set('display_errors', 1);\n/* That's all, stop editing! Happy blogging. */", $config);
+    $config = preg_replace("/\/\* That's all, stop editing!/i", "define('WP_DEBUG', true);\ndefine('WP_DEBUG_DISPLAY', true);\n@ini_set('display_errors', 1);\n/* That's all, stop editing!", $config);
     file_put_contents ($wp_config, $config);
     return true;
 }
@@ -1293,7 +1301,7 @@ function rrmdir($dir, $failedRemovals=[])
  */
 function extractZipFromUrl($url, $path, $archiveName)
 {
-    $archive = $path . $archiveName;
+    $archive = $path.DS.$archiveName;
     if (!file_put_contents($archive, file_get_contents($url))) {
         return false;
     }
@@ -1319,12 +1327,12 @@ function replaceDefaultFiles()
 {
     $url = 'http://wordpress.org/latest.zip';
     $file = 'wordpress.zip';
-    if (!extractZipFromUrl($url, './', 'wordpress.zip')) {
+    if (!extractZipFromUrl($url, WEB_ROOT, 'wordpress.zip')) {
         return false;
     }
 
-    rmove('wordpress', '.');  // 'wordpress' directory is created after extracting the archive
-    rrmdir('wordpress');
+    rmove(WEB_ROOT.'wordpress', WEB_ROOT);  // 'wordpress' directory is created after extracting the archive
+    rrmdir(WEB_ROOT.'wordpress');
     return true;
 }
 
@@ -1370,7 +1378,7 @@ function findLatest2019()
  */
 function replace2019()
 {
-    $themesFolderPath = 'wp-content/themes/';
+    $themesFolderPath = WEB_ROOT.'wp-content/themes/';
     $themeName = 'twentynineteen';
     $themePath = $themesFolderPath . $themeName;
     $version = findLatest2019();
@@ -1411,7 +1419,7 @@ function activate2019()
  */
 function createEasyWpSymLink()
 {
-    $target_pointer = "../../easywp-plugin/mu-plugins";
+    $target_pointer = WEB_ROOT."../../easywp-plugin/mu-plugins";
     $link_name = '/var/www/wptbox/wp-content/mu-plugins';
     if (is_link($link_name)) {
         return true;
@@ -1429,7 +1437,7 @@ function createEasyWpSymLink()
  */
 function createObjectCache()
 {
-    $filePath = 'wp-content/object-cache.php';
+    $filePath = WEB_ROOT.'wp-content/object-cache.php';
     $correctFileSum = '0d798e3e13049ca5f96c0a0b2b44f63211f70837';
     $cdnObjectCache = 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401561/object-cache.php';
 
@@ -1458,7 +1466,7 @@ function statAllFiles($dir)
 {
     $files = scandir($dir);
     foreach($files as $key => $value){
-        $path = realpath($dir.DIRECTORY_SEPARATOR.$value);
+        $path = realpath($dir.DS.$value);
         if(!is_dir($path)) {
             stat($path);
             clearstatcache($path);
@@ -1634,7 +1642,14 @@ function unzipArchivePost($archiveName)
     }
 
     try {
-        $result = unzipArchive($archiveName, $_POST['destDir'], $startNum, $_POST['maxUnzipTime']);  // try extracting archive
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['destDir'][0] == '/') {
+            $destDir = $_POST['destDir'];
+        } else {
+            $destDir = WEB_ROOT.$_POST['destDir'];
+        }
+
+        $result = unzipArchive($archiveName, $destDir, $startNum, $_POST['maxUnzipTime']);  // try extracting archive
         if ($result === true) {
             die(json_encode(array('success' => true,
                                   'error' => '',
@@ -1696,7 +1711,15 @@ function processPreCheckRequest()
     try {
         $numberSuccess = true;
         $counter = new FileCounter();
-        $number = $counter->countFiles($_POST['directory']);  // try counting files
+
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['directory'][0] == '/') {
+            $directory = $_POST['directory'];
+        } else {
+            $directory = WEB_ROOT.$_POST['directory'];
+        }
+
+        $number = $counter->countFiles($directory);  // try counting files
         $numberError = '';
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of fail
@@ -1706,7 +1729,14 @@ function processPreCheckRequest()
         $numberError = $e->getMessage();
     }
 
-    if (checkArchive($_POST['archive'])) {
+    // if path is not absolute, prepend it with WEB_ROOT.
+    if ($_POST['archive'][0] == '/') {
+        $archive = $_POST['archive'];
+    } else {
+        $archive = WEB_ROOT.$_POST['archive'];
+    }
+
+    if (checkArchive($archive)) {
         $checkArchiveSuccess = true;
     } else {
         $checkArchiveSuccess = false;
@@ -1730,8 +1760,16 @@ function processArchiveRequest()
     } else {
         $startNum = 0;
     }
+
+    // if path is not absolute, prepend it with WEB_ROOT.
+    if ($_POST['archiveName'][0] == '/') {
+        $archiveName = $_POST['archiveName'];
+    } else {
+        $archiveName = WEB_ROOT.$_POST['archiveName'];
+    }
+
     try {
-        $archive = new DirZipArchive($_POST['archiveName'], $startNum);
+        $archive = new DirZipArchive($archiveName, $startNum);
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of complete fail
         unlink(FILES);
@@ -1856,7 +1894,7 @@ function websiteIsUp($url)
 function installPlugin($url)
 {
     $pluginZip = substr($url, strrpos($url, '/') + 1); // get string after the last slash, containing the name of the zip file
-    $permFile = 'wp-content/plugins/'.$pluginZip;
+    $permFile = WEB_ROOT.'wp-content/plugins/'.$pluginZip;
     $tmpFile = download_url($url, $timeout = 300);
     if (is_wp_error($tmpFile)) {
         return false;
@@ -1864,7 +1902,7 @@ function installPlugin($url)
     copy($tmpFile, $permFile);
     unlink($tmpFile);
     WP_Filesystem();
-    $unzipFile = unzip_file($permFile, 'wp-content/plugins');
+    $unzipFile = unzip_file($permFile, WEB_ROOT.'wp-content/plugins');
     unlink($permFile);
     if (is_wp_error($unzipFile)) {
         return false;
@@ -1912,7 +1950,7 @@ function deactivatePlugin($pluginPath)
  */
 function deletePlugin($pluginFolder)
 {
-    $failedRemovals = rrmdir('wp-content/plugins/'.$pluginFolder);
+    $failedRemovals = rrmdir(WEB_ROOT.'wp-content/plugins/'.$pluginFolder);
     if ($failedRemovals) {
         return false;
     } else {
@@ -1967,9 +2005,9 @@ function usageEnable()
 {
     $wpLoginUrl = getWpLoginUrl();
     if (websiteIsUp($wpLoginUrl)) {
-        require_once('wp-blog-header.php');
-        require_once('wp-admin/includes/file.php');
-        require_once('wp-admin/includes/plugin.php');
+        require_once(WEB_ROOT.'wp-blog-header.php');
+        require_once(WEB_ROOT.'wp-admin/includes/file.php');
+        require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
         if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
             if (activatePlugin('usagedd/usagedd.php')) {
                 $success = true;
@@ -2003,9 +2041,9 @@ function usageDisable()
 {
     $wpLoginUrl = getWpLoginUrl();
     if (websiteIsUp($wpLoginUrl)) {
-        require_once('wp-blog-header.php');
-        require_once('wp-admin/includes/file.php');
-        require_once('wp-admin/includes/plugin.php');
+        require_once(WEB_ROOT.'wp-blog-header.php');
+        require_once(WEB_ROOT.'wp-admin/includes/file.php');
+        require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
         if (deactivatePlugin('usagedd/usagedd.php')) {
             if (deletePlugin('usagedd')) {
                 $success = true;
@@ -2039,9 +2077,9 @@ function usageDisable()
 function selfDestruct()
 {
     session_destroy();
-    $files = array('wp-admin/adminer-auto.php',
-                   'wp-admin/adminer.php',
-                   'wp-admin/adminer.css',
+    $files = array(WEB_ROOT.'wp-admin/adminer-auto.php',
+                   WEB_ROOT.'wp-admin/adminer.php',
+                   WEB_ROOT.'wp-admin/adminer.css',
                     __FILE__);
     foreach($files as $file) {
         if (file_exists($file)) {
@@ -2055,7 +2093,7 @@ function selfDestruct()
     clearAll();
 }
 
-
+// if Debugger is not removed by API in 2 hours for some reason, next time someone will access it, it will be removed automatically. The statement is here, before POST requests section, so that the file is removed before Debugger responds to a request.
 if (time() - filemtime(__FILE__) > 9000) {
     selfDestruct();
     die(1);
@@ -2172,10 +2210,11 @@ if (authorized()) {
 
     /* uploads adminer-auto files and sets a session to access Adminer */
     if (isset($_POST['adminerOn'])) {
-        $adminerFilesAndSources = array('wp-admin/adminer-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php' ,
-                                        'wp-admin/adminer.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php' ,
-                                        'wp-admin/adminer.css' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css' ,
-                                        );
+        $adminerFilesAndSources = array(
+            WEB_ROOT.'wp-admin/adminer-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php' ,
+            WEB_ROOT.'wp-admin/adminer.php'      => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php' ,
+            WEB_ROOT.'wp-admin/adminer.css'      => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css' ,
+        );
         if (uploadFiles($adminerFilesAndSources)) {
             $_SESSION['debugger_adminer'] = true;
             die(json_encode(array('success' => true)));
@@ -2186,16 +2225,22 @@ if (authorized()) {
 
     /* removes adminer-auto files and unsets the session */
     if (isset($_POST['adminerOff'])) {
-        unlink('wp-admin/adminer-auto.php');
-        unlink('wp-admin/adminer.php');
-        unlink('wp-admin/adminer.css');
+        unlink(WEB_ROOT.'wp-admin/adminer-auto.php');
+        unlink(WEB_ROOT.'wp-admin/adminer.php');
+        unlink(WEB_ROOT.'wp-admin/adminer.css');
         unset($_SESSION['debugger_adminer']);
         die(json_encode(array('success' => true)));
     }
 
     /* prints success=true if the destination directory of extraction exists or has been successfully created */
     if (isset($_POST['checkDestDir'])) {
-        $destDir = $_POST['destDir'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['destDir'][0] == '/') {
+            $destDir = $_POST['destDir'];
+        } else {
+            $destDir = WEB_ROOT.$_POST['destDir'];
+        }
+
         if (checkDestDir($destDir)) {
             die(json_encode(array('success' => true)));
         } else {
@@ -2205,7 +2250,13 @@ if (authorized()) {
 
     /* if something needs to be done with an archive */
     if (isset($_POST['archiveName']) && isset($_POST['action'])) {
-        $archiveName = $_POST['archiveName'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['archiveName'][0] == '/') {
+            $archiveName = $_POST['archiveName'];
+        } else {
+            $archiveName = WEB_ROOT.$_POST['archiveName'];
+        }
+
 
         if ($_POST['action'] == 'extract') {  // extract archive
             unzipArchivePost($archiveName);
@@ -2216,8 +2267,15 @@ if (authorized()) {
 
     /* counts files and directories in a directory and returns their total number */
     if (isset($_POST['filesNumber'])) {
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['filesNumber'][0] == '/') {
+            $archiveName = $_POST['filesNumber'];
+        } else {
+            $archiveName = WEB_ROOT.$_POST['filesNumber'];
+        }
+
         try {
-            $number = countFiles($_POST['filesNumber']);
+            $number = countFiles($archiveName);
         } catch (Exception $e) {
             die(json_encode(array('success' => true,
                                   'number' => 0,
@@ -2276,8 +2334,9 @@ if (authorized()) {
 
         // if there is site URL, proceed with uploading the wp-admin-auto file
         if ($siteUrl) {
-            $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
-                                              );
+            $autoLoginFilesAndSources = array(
+                WEB_ROOT.'wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php',
+            );
             if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
                 $success = true;
                 $file = true;
@@ -2299,7 +2358,7 @@ if (authorized()) {
 
     /* deletes wp-admin-auto.php file */
     if (isset($_POST['deleteAutoLogin'])) {
-        if (unlink('wp-admin-auto.php')) {
+        if (unlink(WEB_ROOT.'wp-admin-auto.php')) {
             die(json_encode(array('success' => true)));
         } else {
             die(json_encode(array('success' => false)));
@@ -2308,7 +2367,13 @@ if (authorized()) {
 
     /* deletes a file or folder from the hosting storage */
     if (isset($_POST['deleteEntry'])) {
-        $entry = $_POST['entry'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['entry'][0] == '/') {
+            $entry = $_POST['entry'];
+        } else {
+            $entry = WEB_ROOT.$_POST['entry'];
+        }
+
         if (!file_exists($entry)) {  // if entry does not exist
             die(json_encode(array('success' => false ,
                                   'error' => 'No Such File' ,
@@ -3198,7 +3263,7 @@ var sendUsageDisableRequest = function() {
             }
             handleEmptyResponse($("#btnUsageOff"), jsonData);
             if (jsonData.success) {
-                printMsg('The plugin has been disabled.', true, 'success-progress');
+                printMsg('The plugin has been disabled and removed.', true, 'success-progress');
             } else if (jsonData.error == 'websiteDown') {
                 printMsg('The website is down. Please fix it first.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginDeactivation') {
