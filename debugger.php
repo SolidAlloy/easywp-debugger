@@ -2578,13 +2578,6 @@ var transferActiveTab = function() {
 };
 
 
-var getSelfFilename = function() {
-    var pathname = window.location.pathname;
-    var filename = pathname.substring(pathname.lastIndexOf('/')+1);
-    return filename;
-};
-
-
 var sendCronReport = function(message, endpoint) {
     $.ajax({
         timeout: 10000,
@@ -2615,13 +2608,13 @@ var sendCronRequest = function(endpoint) {
         method = 'POST';
         postData = {
             'domain': window.location.hostname,
-            'file': getSelfFilename(),
+            'path': window.location.pathname,
         };
     } else if (endpoint == 'delete') {
         url = 'https://cron.nctool.me/delete/'+window.location.hostname;
         method = 'DELETE';
         postData = {
-            'file': getSelfFilename(),
+            'path': window.location.pathname,
         };
     } else {
         throw "Unknown endpoint for sendCronRequest()";
