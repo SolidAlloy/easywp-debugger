@@ -567,8 +567,12 @@ class EasyWP_Cache
     protected function getNeededKeys()
     {
         $keysDict = [];
-        $loginKeys = $this->keys('*~login:*');
-        foreach ($loginKeys as $key) {
+        // Get an array of all the keys that must not be deleted
+        $keys = $this->keys('*~failedTries:*');
+        $keys = array_merge($keys, $this->keys('*~blocked:*'));
+        $keys = array_merge($keys, $this->keys('*~blocksNumber:*'));
+        // Add information about each key from the array and put it into a dictionary
+        foreach ($keys as $key) {
             $keysDict[$key] = [
                 $this->fetch($key),
                 $this->ttl($key),
@@ -603,8 +607,8 @@ class EasyWP_Cache
     /**
      * Gets TTL of a key
      *
-     * @param  string $key Key to check the TTL of
-     * @return integer     TTL  of the key, -2 if key doesn't exist
+     * @param  string $key Key to check the TTL of.
+     * @return integer     TTL of the key, -2 if key doesn't exist.
      */
     public function ttl($key)
     {
@@ -643,11 +647,13 @@ class EasyWP_Cache
  */
 class DBconn {
     // Regexes to find DB details in wp-config.php
-    protected $patterns = array('/DB_NAME\'\s*?,\s*?\'(.*)\'/',
-                              '/DB_USER\'\s*?,\s*?\'(.*)\'/',
-                              '/DB_PASSWORD\'\s*?,\s*?\'(.*)\'/',
-                              '/DB_HOST\'\s*?,\s*?\'(.*)\'/',
-                              '/table_prefix\s*?=\s*?\'(.*)\'/');
+    protected $patterns = array(
+        '/DB_NAME\'\s*?,\s*?\'(.*)\'/',
+        '/DB_USER\'\s*?,\s*?\'(.*)\'/',
+        '/DB_PASSWORD\'\s*?,\s*?\'(.*)\'/',
+        '/DB_HOST\'\s*?,\s*?\'(.*)\'/',
+        '/table_prefix\s*?=\s*?\'(.*)\'/'
+    );
     protected $db_details = array();
     public $errors = array();
     public $connected = false;
@@ -1975,22 +1981,29 @@ function login($password)
         $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
     }
 
-    $failedLoginKey = "{$_SERVER['SERVER_NAME']}~login:{$_SERVER['REMOTE_ADDR']}";
-    $blockedKey = "{$_SERVER['SERVER_NAME']}~login-blocked:{$_SERVER['REMOTE_ADDR']}";
+    $failedTriesKey = "{$_SERVER['SERVER_NAME']}~failedTries:{$_SERVER['REMOTE_ADDR']}";
+    $blockedKey = "{$_SERVER['SERVER_NAME']}~blocked:{$_SERVER['REMOTE_ADDR']}";
+    $blocksNumberKey = "{$_SERVER['SERVER_NAME']}~blocksNumber:{$_SERVER['REMOTE_ADDR']}";
 
-    $tries = (int)$cache->fetch($failedLoginKey);
-    if ($tries >= 10) {
+    $blocked = $cache->fetch($blockedKey);
+    if ($blocked) {
         throw new Exception("You've exceeded the number of login attempts. We've blocked IP address {$_SERVER['REMOTE_ADDR']} for a few minutes.");
     }
 
     if (!passwordMatch($password)) {
-        $blocked = (int)$cache->fetch($blockedKey);
-        $cache->store($failedLoginKey, $tries+1, pow(2, $blocked+1)*60);  // store tries for 2^(x+1) minutes: 2, 4, 8, 16, ...
-        $cache->store($blockedKey, $blocked+1, 86400);  // store number of times blocked for 24 hours
+        $failedTries = (int)$cache->fetch($failedTriesKey) + 1;
+        $blocksNumber = (int)$cache->fetch($blocksNumberKey);
+        if ($failedTries >= 10) {
+            $cache->delete($failedTriesKey);  // reset the failed tries counter
+            $cache->store($blockedKey, true, pow(2, $blocksNumber+1)*60);  // activate block for 2^(x+1) minutes: 2, 4, 8, 16 ...
+            $cache->store($blocksNumberKey, $blocksNumber+1, 86400);  // store the total number of blocks for 24 hours
+        } else {
+            $cache->store($failedTriesKey, $failedTries, 1200);  // save failed tries + 1 to the key for 20 minutes
+        }
         return false;
     } else {
-        $cache->delete($failedLoginKey);
-        $cache->delete($blockedKey);
+        $cache->delete($failedTriesKey);
+        $cache->delete($blocksNumberKey);
         return true;
     }
 }
