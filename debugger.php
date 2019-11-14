@@ -643,11 +643,11 @@ class EasyWP_Cache
  */
 class DBconn {
     // Regexes to find DB details in wp-config.php
-    protected $patterns = array('/DB_NAME\', \'(.*)\'/',
-                              '/DB_USER\', \'(.*)\'/',
-                              '/DB_PASSWORD\', \'(.*)\'/',
-                              '/DB_HOST\', \'(.*)\'/',
-                              '/table_prefix = \'(.*)\'/');
+    protected $patterns = array('/DB_NAME\'\s*?,\s*?\'(.*)\'/',
+                              '/DB_USER\'\s*?,\s*?\'(.*)\'/',
+                              '/DB_PASSWORD\'\s*?,\s*?\'(.*)\'/',
+                              '/DB_HOST\'\s*?,\s*?\'(.*)\'/',
+                              '/table_prefix\s*?=\s*?\'(.*)\'/');
     protected $db_details = array();
     public $errors = array();
     public $connected = false;
@@ -3896,7 +3896,7 @@ $(document).ready(function() {
 
 var processLoginform = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Logging in...';
-    var failText = 'LOG IN';
+    var idleText = 'LOG IN';
     $button = $('#btnLogin');
     form.preventDefault();
     $button.prop("disabled", true);
@@ -3906,8 +3906,10 @@ var processLoginform = function(form) {
     sendCronRequest('create');
 
     $('#password-invalid').removeClass('show').addClass('d-none');
-    var password = $("#login-form").val();
+    var password = $("#password").val();
     if (handleEmptyField(password)) {
+        $button.prop("disabled", false);
+        $button.html(idleText);
         return;
     }
     $.ajax({
@@ -3928,18 +3930,18 @@ var processLoginform = function(form) {
                 }
             } else if (jsonData.error) {
                 $button.prop("disabled", false);
-                $button.html(failText);
+                $button.html(idleText);
                 printMsg(jsonData.error);
             } else {
                 $button.prop("disabled", false);
-                $button.html(failText);
+                $button.html(idleText);
                 printMsg('Invalid password');
             }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
             $button.prop("disabled", false);
-            $button.html(failText);
+            $button.html(idleText);
         }
     });
 };
