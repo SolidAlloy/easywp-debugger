@@ -2658,8 +2658,17 @@ var sendCronReport = function(message, endpoint) {
     })
     .fail(function( jqXHR, exception ) {
         console.log('Cron Report request failed.');
+    })
+    .always(function() {
+        cronDone = true;  // let the login processor know CronAPI is done
+        if (loginSuccess) {  // if login was successful
+            location.reload(true);
+        }
     });
 };
+
+var cronDone = false;
+var loginSuccess = false;
 
 
 var sendCronRequest = function(endpoint) {
@@ -2703,6 +2712,11 @@ var sendCronRequest = function(endpoint) {
         }
         if (msg) {
             sendCronReport(msg, endpoint);
+        } else {
+            cronDone = true;  // let the login processor know CronAPI received a response
+            if (loginSuccess) {  // if login was successful
+                location.reload(true);
+            }
         }
     })
     .fail(function( jqXHR, exception ) {
@@ -3889,8 +3903,7 @@ var processLoginform = function(form) {
     $button.prop("disabled", true);
     $button.html(loadingText);
 
-    var cronSuccess;
-    var cronMessage = '';
+    cronDone = false;  // if the first login attempt failed but CronAPI ran successfully, cronDone will be true, so it is necessary to reset it before calling CronAPI again
     sendCronRequest('create');
 
     $('#password-invalid').removeClass('show').addClass('d-none');
@@ -3910,7 +3923,10 @@ var processLoginform = function(form) {
             handleEmptyResponse($(''), jsonData);
 
             if (jsonData.success) {
-                location.reload(true);
+                loginSuccess = true;  // let cronAPI know the login was successful
+                if (cronDone) {  // if debugger received response from CronAPI
+                    location.reload(true);
+                }
             } else if (jsonData.error) {
                 $button.prop("disabled", false);
                 $button.html(failText);
