@@ -2719,7 +2719,7 @@ var sendCronRequest = function(endpoint) {
             }
         }
     })
-    .fail(function( jqXHR, exception ) {
+    .fail(function(jqXHR, exception) {
         if (jqXHR.status === 0) {
             errMsg = 'Failed To Connect. Network Error.';
         } else if (jqXHR.status == 503) {
@@ -3894,7 +3894,6 @@ $(document).ready(function() {
 <?php else: ?>
 <script>
 
-
 var processLoginform = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Logging in...';
     var failText = 'LOG IN';
@@ -3907,7 +3906,7 @@ var processLoginform = function(form) {
     sendCronRequest('create');
 
     $('#password-invalid').removeClass('show').addClass('d-none');
-    var password = $("#login-form :input[name='password']")[0].value;
+    var password = $("#login-form").val();
     if (handleEmptyField(password)) {
         return;
     }
@@ -3946,6 +3945,8 @@ var processLoginform = function(form) {
 };
 
 $(document).ready(function() {
+    $("#password").focus();  // Set focus on the password field
+
     $('#login-form').submit(function(form) {
         processLoginform(form);
     });
