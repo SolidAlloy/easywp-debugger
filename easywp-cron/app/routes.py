@@ -76,7 +76,7 @@ def analyze():
     error = False
     if all(x is True for x in validated_inputs.values()):
         try:
-            response = requests.get('http://' + domain + '/' + path,
+            response = requests.get('http://' + domain + path,
                                     params={
                                         'selfDestruct': '1',
                                         'silent': '1',
