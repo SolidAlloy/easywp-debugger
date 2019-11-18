@@ -767,7 +767,11 @@ class DBconn {
             }
         }
         fclose($wp_config);
-        return $db_details;
+        if ($db_details['prefix']) {
+            return $db_details;
+        } else {
+            array_push($this->errors, "<strong>Database connection failed:</strong> Table prefix was not found in wp-config.php");
+        }
     }
 
     /**
@@ -2016,27 +2020,22 @@ function login($password)
  */
 function usageEnable()
 {
-    $wpLoginUrl = getWpLoginUrl();
-    if (websiteIsUp($wpLoginUrl)) {
-        require_once(WEB_ROOT.'wp-blog-header.php');
-        require_once(WEB_ROOT.'wp-admin/includes/file.php');
-        require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
-        if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
-            if (activatePlugin('usagedd/usagedd.php')) {
-                $success = true;
-                $error = '';
-            } else {
-                $success = false;
-                $error = 'pluginActivation';
-            }
+    require_once(WEB_ROOT.'wp-blog-header.php');
+    require_once(WEB_ROOT.'wp-admin/includes/file.php');
+    require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
+    if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
+        if (activatePlugin('usagedd/usagedd.php')) {
+            $success = true;
+            $error = '';
         } else {
             $success = false;
-            $error = 'pluginInstallation';
+            $error = 'pluginActivation';
         }
     } else {
         $success = false;
-        $error = 'websiteDown';
+        $error = 'pluginInstallation';
     }
+
     http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
 
     return [
@@ -2052,26 +2051,20 @@ function usageEnable()
  */
 function usageDisable()
 {
-    $wpLoginUrl = getWpLoginUrl();
-    if (websiteIsUp($wpLoginUrl)) {
-        require_once(WEB_ROOT.'wp-blog-header.php');
-        require_once(WEB_ROOT.'wp-admin/includes/file.php');
-        require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
-        if (deactivatePlugin('usagedd/usagedd.php')) {
-            if (deletePlugin('usagedd')) {
-                $success = true;
-                $error = '';
-            } else {
-                $success = false;
-                $error = 'pluginDeletion';
-            }
+    require_once(WEB_ROOT.'wp-blog-header.php');
+    require_once(WEB_ROOT.'wp-admin/includes/file.php');
+    require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
+    if (deactivatePlugin('usagedd/usagedd.php')) {
+        if (deletePlugin('usagedd')) {
+            $success = true;
+            $error = '';
         } else {
-            $success == false;
-            $error = 'pluginDeactivation';
+            $success = false;
+            $error = 'pluginDeletion';
         }
     } else {
-        $success = false;
-        $error = 'websiteDown';
+        $success == false;
+        $error = 'pluginDeactivation';
     }
 
     http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
@@ -2348,7 +2341,7 @@ if (authorized()) {
         // if there is site URL, proceed with uploading the wp-admin-auto file
         if ($siteUrl) {
             $autoLoginFilesAndSources = array(
-                WEB_ROOT.'wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php',
+                WEB_ROOT.'wp-admin/wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1574073049/wp-admin-auto_ahlm25.php',
             );
             if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
                 $success = true;
@@ -2371,7 +2364,7 @@ if (authorized()) {
 
     /* deletes wp-admin-auto.php file */
     if (isset($_POST['deleteAutoLogin'])) {
-        if (unlink(WEB_ROOT.'wp-admin-auto.php')) {
+        if (unlink(WEB_ROOT.'wp-admin/wp-admin-auto.php')) {
             die(json_encode(array('success' => true)));
         } else {
             die(json_encode(array('success' => false)));
@@ -3152,7 +3145,7 @@ var sendAutoLoginRequest = function() {
             if (jsonData.success) {
                 printMsg('You will be redirected in a second.', true, 'success-progress');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
-                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
+                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (jsonData.file === false) {  // it can also be true and null
@@ -3234,29 +3227,80 @@ var sendSubResourcesRequest = function() {
     });
 };
 
+
+var checkWpAdmin = function(func, $button, idleText) {
+    var url = window.location.protocol + '//' + window.location.hostname + '/wp-admin/';
+    $.ajax({
+        timeout: 10000,
+        url: url,
+        type: 'GET',
+    })
+    .done(function(htmlPage) {
+        if ($.trim(htmlPage)) {
+            if (htmlPage.includes('<div id="login">')) {
+                func($button, idleText);  // If website is up, it is safe to send the request.
+                return;
+            } else {
+                msg = url + " was loaded successfully but it doesn't look like a wp-admin login page.";
+            }
+        } else {
+            msg = url + ' gave no output';
+        }
+        printMsg('The website is down. Please fix it first.', false, 'warning-progress');
+        printMsg(msg, true, 'danger-progress');
+        $button.prop("disabled", false);
+        $button.html(idleText);
+    })
+    .fail(function(jqXHR, exception) {
+        if (jqXHR.status === 0) {
+            errMsg = 'Failed To Connect. Network Error.';
+        } else if (jqXHR.status == 503) {
+            errMsg = 'Service Unavailable. [503]';
+        } else if (jqXHR.status == 404) {
+            errMsg = 'Requested page not found. [404]';
+        } else if (jqXHR.status == 500) {
+            errMsg = 'Internal Server Error [500].';
+        } else if (exception === 'timeout') {
+            errMsg = 'Time out error.';
+        } else if (exception === 'abort') {
+            errMsg = 'Ajax request aborted.';
+        } else {
+            errMsg = 'Uncaught Error.\n' + jqXHR.responseText;
+        }
+        msg = url + ' returned "' + errMsg + '"';
+        printMsg('The website is down. Please fix it first.', false, 'warning-progress');
+        printMsg(msg, true, 'danger-progress');
+        $button.prop("disabled", false);
+        $button.html(idleText);
+    });
+};
+
+
 /**
  * Sends a request to upload and activate the UsageDD plugin
  *
  * @return {null}
  */
-var sendUsageEnableRequest = function() {
+var sendUsageEnableRequest = function($button, idleText) {
     $.ajax({
         type: "POST",
         timeout: 20000,
         data: {usageEnable: 'submit'},
         success: function(response) {
+            $button.prop("disabled", false);
+            $button.html(idleText);
+
             var jsonData;
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
+
                 return;
             }
             handleEmptyResponse($("#btnUsageOn"), jsonData);
             if (jsonData.success) {
                 printMsg('The plugin has been installed. You can log into wp-admin now and check the resource usage of the website. Check this page to find out about what the numbers mean <a href="https://wordpress.org/plugins/usagedd/">https://wordpress.org/plugins/usagedd/</a>', true, 'success-progress');
-            } else if (jsonData.error == 'websiteDown') {
-                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginInstallation') {
                 printMsg('The plugin installation failed. Please try installing <a href="https://wordpress.org/plugins/usagedd/">UsageDD</a> manually.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginActivation') {
@@ -3266,21 +3310,36 @@ var sendUsageEnableRequest = function() {
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
+            $button.prop("disabled", false);
+            $button.html(idleText);
         }
     });
 };
+
+
+var enableUsage = function($button) {
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Enabling...';
+    var idleText = 'Enable UsageDD';
+    $button.prop("disabled", true);
+    $button.html(loadingText);
+    checkWpAdmin(sendUsageEnableRequest, $button, idleText);
+};
+
 
 /**
  * Sends a request to deactivate and remove the UsageDD plugin
  *
  * @return {null}
  */
-var sendUsageDisableRequest = function() {
+var sendUsageDisableRequest = function($button, idleText) {
     $.ajax({
         type: "POST",
         timeout: 20000,
         data: {usageDisable: 'submit'},
         success: function(response) {
+            $button.prop("disabled", false);
+            $button.html(idleText);
+
             var jsonData;
             try {
                 jsonData = JSON.parse(response);
@@ -3291,8 +3350,6 @@ var sendUsageDisableRequest = function() {
             handleEmptyResponse($("#btnUsageOff"), jsonData);
             if (jsonData.success) {
                 printMsg('The plugin has been disabled and removed.', true, 'success-progress');
-            } else if (jsonData.error == 'websiteDown') {
-                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginDeactivation') {
                 printMsg("The plugin deactivation failed. Please try deactivating and removing it manually.", true, 'warning-progress');
             } else if (jsonData.error == 'pluginDeletion') {
@@ -3302,9 +3359,21 @@ var sendUsageDisableRequest = function() {
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
+            $button.prop("disabled", false);
+            $button.html(idleText);
         }
     });
 };
+
+
+var disableUsage = function($button) {
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Disabling...';
+    var idleText = 'Disable UsageDD';
+    $button.prop("disabled", true);
+    $button.html(loadingText);
+    checkWpAdmin(sendUsageDisableRequest, $button, idleText);
+};
+
 
 /**
  * [sendVersionCheckRequest checks if the version on GitHub is higher than the current one]
@@ -3894,11 +3963,11 @@ $(document).ready(function() {
     });
 
     $('#btnUsageOn').click(function() {
-        sendUsageEnableRequest();
+        enableUsage($(this));
     });
 
     $('#btnUsageOff').click(function() {
-        sendUsageDisableRequest();
+        disableUsage($(this));
     });
 
 });
