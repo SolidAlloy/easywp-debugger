@@ -1,6 +1,6 @@
 <?php
-require('wp-blog-header.php');
-require('wp-includes/pluggable.php');
+require('../wp-blog-header.php');
+require('../wp-includes/pluggable.php');
 
 $signon_user = '';
 
