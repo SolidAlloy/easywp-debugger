@@ -648,11 +648,11 @@ class EasyWP_Cache
 class DBconn {
     // Regexes to find DB details in wp-config.php
     protected $patterns = array(
-        '/DB_NAME\'\s*?,\s*?\'(.*)\'/',
-        '/DB_USER\'\s*?,\s*?\'(.*)\'/',
-        '/DB_PASSWORD\'\s*?,\s*?\'(.*)\'/',
-        '/DB_HOST\'\s*?,\s*?\'(.*)\'/',
-        '/table_prefix\s*?=\s*?\'(.*)\'/'
+        '/DB_NAME\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_USER\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_PASSWORD\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_HOST\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/table_prefix\s*?=\s*?[\'"](.*)[\'"]/'
     );
     protected $db_details = array();
     public $errors = array();
@@ -2978,7 +2978,11 @@ var sendAdminerOnRequest = function() {
             if (jsonData.success) {
                 printMsg('Adminer Enabled Successfully!', true, 'success-progress');
                 // open Adminer in a new tab in 1 second after the success message is shown
-                setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
+                if (window.location.pathname.includes('wp-admin')) {
+                    setTimeout(function() { window.open("adminer-auto.php"); }, 1000);
+                } else {
+                    setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
+                }
             } else {
                 printMsg('Adminer Failed!', true, 'warning-progress');
             }
@@ -2988,6 +2992,16 @@ var sendAdminerOnRequest = function() {
         }
     });
 };
+
+
+var openAdminer = function() {
+    if (window.location.pathname.includes('wp-admin')) {
+        window.open("adminer-auto.php");
+    } else {
+        window.open("wp-admin/adminer-auto.php");
+    }
+};
+
 
 /**
  * [sendAdminerOffRequest removes adminer-auto files and unsets the session]
@@ -4682,7 +4696,7 @@ $(document).ready(function() {
                     <div class="col-xs-smaller-12">
                         <div class="btn-group" role="group" aria-label="Adminer Group">
                             <button type="button" class="btn stylish-success" id="btnAdminerOn">Enable Adminer</button>
-                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
+                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="openAdminer()">Go To Adminer</button>
                             <button type="button" class="btn stylish-warning" id="btnAdminerOff">Disable Adminer</button>
                         </div>
                     </div>
