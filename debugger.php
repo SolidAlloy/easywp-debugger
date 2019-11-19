@@ -59,6 +59,14 @@ define('FILES', 'files.txt');
 // send error reports regarding easywp-cron failures to the following addresses
 define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, perepelartem@gmail.com');
 
+// find the website root directory if debugger is uploaded to wp-admin
+$curDir = dirname(__FILE__);
+if (basename($curDir) == 'wp-admin') {
+    define('WEB_ROOT', dirname($curDir).'/');
+} else {
+    define('WEB_ROOT', $curDir.'/');
+}
+
 
 /*
     !!! PHP classes section !!!
@@ -236,12 +244,12 @@ class Redis_Object_Cache
                 // Load bundled Predis library
                 if (!class_exists('Predis\Client')) {
                     // Restore symlink if it is broken
-                    $plugin_dir = 'wp-content/mu-plugins';
+                    $plugin_dir = WEB_ROOT.'wp-content/mu-plugins';
                     if (file_exists('/var/www/wptbox/wp-content/mu-plugins')
                         && is_link('/var/www/wptbox/wp-content/mu-plugins')) {
                             // pass
                     } else {
-                        $target_pointer = "../../easywp-plugin/mu-plugins";
+                        $target_pointer = WEB_ROOT."../../easywp-plugin/mu-plugins";
                         $link_name = '/var/www/wptbox/wp-content/mu-plugins';
                         symlink($target_pointer, $link_name);
                     }
@@ -559,8 +567,12 @@ class EasyWP_Cache
     protected function getNeededKeys()
     {
         $keysDict = [];
-        $loginKeys = $this->keys('*~login:*');
-        foreach ($loginKeys as $key) {
+        // Get an array of all the keys that must not be deleted
+        $keys = $this->keys('*~failedTries:*');
+        $keys = array_merge($keys, $this->keys('*~blocked:*'));
+        $keys = array_merge($keys, $this->keys('*~blocksNumber:*'));
+        // Add information about each key from the array and put it into a dictionary
+        foreach ($keys as $key) {
             $keysDict[$key] = [
                 $this->fetch($key),
                 $this->ttl($key),
@@ -595,8 +607,8 @@ class EasyWP_Cache
     /**
      * Gets TTL of a key
      *
-     * @param  string $key Key to check the TTL of
-     * @return integer     TTL  of the key, -2 if key doesn't exist
+     * @param  string $key Key to check the TTL of.
+     * @return integer     TTL of the key, -2 if key doesn't exist.
      */
     public function ttl($key)
     {
@@ -635,11 +647,13 @@ class EasyWP_Cache
  */
 class DBconn {
     // Regexes to find DB details in wp-config.php
-    protected $patterns = array('/DB_NAME\', \'(.*)\'/',
-                              '/DB_USER\', \'(.*)\'/',
-                              '/DB_PASSWORD\', \'(.*)\'/',
-                              '/DB_HOST\', \'(.*)\'/',
-                              '/table_prefix = \'(.*)\'/');
+    protected $patterns = array(
+        '/DB_NAME\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_USER\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_PASSWORD\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/DB_HOST\s*?[\'"]\s*?,\s*?[\'"](.*)[\'"]/',
+        '/table_prefix\s*?=\s*?[\'"](.*)[\'"]/'
+    );
     protected $db_details = array();
     public $errors = array();
     public $connected = false;
@@ -728,7 +742,7 @@ class DBconn {
                               'prefix' => '' ,
                            );
 
-        $wp_config = fopen('wp-config.php', 'r');
+        $wp_config = fopen(WEB_ROOT.'wp-config.php', 'r');
         if (!$wp_config) {
             array_push($this->errors, "Failed to open wp-config.php");
             return array();
@@ -753,7 +767,11 @@ class DBconn {
             }
         }
         fclose($wp_config);
-        return $db_details;
+        if ($db_details['prefix']) {
+            return $db_details;
+        } else {
+            array_push($this->errors, "<strong>Database connection failed:</strong> Table prefix was not found in wp-config.php");
+        }
     }
 
     /**
@@ -1202,14 +1220,14 @@ function clearAll()
  */
 function wpConfigClear()
 {
-    $wp_config = "wp-config.php";
+    $wp_config = WEB_ROOT."wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
     }
     $config = file_get_contents($wp_config);
-    $config = str_replace("define('WP_DEBUG', true);", '', $config);
-    $config = str_replace("define('WP_DEBUG_DISPLAY', true);", '', $config);
-    $config = str_replace("@ini_set('display_errors', 1);", '', $config);
+    $config = str_replace("define('WP_DEBUG', true);\n", '', $config);
+    $config = str_replace("define('WP_DEBUG_DISPLAY', true);\n", '', $config);
+    $config = str_replace("@ini_set('display_errors', 1);\n", '', $config);
     file_put_contents($wp_config, $config);
     return true;
 }
@@ -1220,12 +1238,12 @@ function wpConfigClear()
  */
 function wpConfigPut()
 {
-    $wp_config = "wp-config.php";
+    $wp_config = WEB_ROOT."wp-config.php";
     if (!is_writable($wp_config) or !is_readable($wp_config)) {
         return false;
     }
     $config = file_get_contents($wp_config);
-    $config = preg_replace("/\/\* That's all, stop editing! Happy blogging\. \*\//i", "define('WP_DEBUG', true);\ndefine('WP_DEBUG_DISPLAY', true);\n@ini_set('display_errors', 1);\n/* That's all, stop editing! Happy blogging. */", $config);
+    $config = preg_replace("/\/\* That's all, stop editing!/i", "define('WP_DEBUG', true);\ndefine('WP_DEBUG_DISPLAY', true);\n@ini_set('display_errors', 1);\n/* That's all, stop editing!", $config);
     file_put_contents ($wp_config, $config);
     return true;
 }
@@ -1293,7 +1311,7 @@ function rrmdir($dir, $failedRemovals=[])
  */
 function extractZipFromUrl($url, $path, $archiveName)
 {
-    $archive = $path . $archiveName;
+    $archive = $path.DS.$archiveName;
     if (!file_put_contents($archive, file_get_contents($url))) {
         return false;
     }
@@ -1319,12 +1337,12 @@ function replaceDefaultFiles()
 {
     $url = 'http://wordpress.org/latest.zip';
     $file = 'wordpress.zip';
-    if (!extractZipFromUrl($url, './', 'wordpress.zip')) {
+    if (!extractZipFromUrl($url, WEB_ROOT, 'wordpress.zip')) {
         return false;
     }
 
-    rmove('wordpress', '.');  // 'wordpress' directory is created after extracting the archive
-    rrmdir('wordpress');
+    rmove(WEB_ROOT.'wordpress', WEB_ROOT);  // 'wordpress' directory is created after extracting the archive
+    rrmdir(WEB_ROOT.'wordpress');
     return true;
 }
 
@@ -1370,7 +1388,7 @@ function findLatest2019()
  */
 function replace2019()
 {
-    $themesFolderPath = 'wp-content/themes/';
+    $themesFolderPath = WEB_ROOT.'wp-content/themes/';
     $themeName = 'twentynineteen';
     $themePath = $themesFolderPath . $themeName;
     $version = findLatest2019();
@@ -1411,7 +1429,7 @@ function activate2019()
  */
 function createEasyWpSymLink()
 {
-    $target_pointer = "../../easywp-plugin/mu-plugins";
+    $target_pointer = WEB_ROOT."../../easywp-plugin/mu-plugins";
     $link_name = '/var/www/wptbox/wp-content/mu-plugins';
     if (is_link($link_name)) {
         return true;
@@ -1429,7 +1447,7 @@ function createEasyWpSymLink()
  */
 function createObjectCache()
 {
-    $filePath = 'wp-content/object-cache.php';
+    $filePath = WEB_ROOT.'wp-content/object-cache.php';
     $correctFileSum = '0d798e3e13049ca5f96c0a0b2b44f63211f70837';
     $cdnObjectCache = 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401561/object-cache.php';
 
@@ -1458,7 +1476,7 @@ function statAllFiles($dir)
 {
     $files = scandir($dir);
     foreach($files as $key => $value){
-        $path = realpath($dir.DIRECTORY_SEPARATOR.$value);
+        $path = realpath($dir.DS.$value);
         if(!is_dir($path)) {
             stat($path);
             clearstatcache($path);
@@ -1634,7 +1652,14 @@ function unzipArchivePost($archiveName)
     }
 
     try {
-        $result = unzipArchive($archiveName, $_POST['destDir'], $startNum, $_POST['maxUnzipTime']);  // try extracting archive
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['destDir'][0] == '/') {
+            $destDir = $_POST['destDir'];
+        } else {
+            $destDir = WEB_ROOT.$_POST['destDir'];
+        }
+
+        $result = unzipArchive($archiveName, $destDir, $startNum, $_POST['maxUnzipTime']);  // try extracting archive
         if ($result === true) {
             die(json_encode(array('success' => true,
                                   'error' => '',
@@ -1696,7 +1721,15 @@ function processPreCheckRequest()
     try {
         $numberSuccess = true;
         $counter = new FileCounter();
-        $number = $counter->countFiles($_POST['directory']);  // try counting files
+
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['directory'][0] == '/') {
+            $directory = $_POST['directory'];
+        } else {
+            $directory = WEB_ROOT.$_POST['directory'];
+        }
+
+        $number = $counter->countFiles($directory);  // try counting files
         $numberError = '';
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of fail
@@ -1706,7 +1739,14 @@ function processPreCheckRequest()
         $numberError = $e->getMessage();
     }
 
-    if (checkArchive($_POST['archive'])) {
+    // if path is not absolute, prepend it with WEB_ROOT.
+    if ($_POST['archive'][0] == '/') {
+        $archive = $_POST['archive'];
+    } else {
+        $archive = WEB_ROOT.$_POST['archive'];
+    }
+
+    if (checkArchive($archive)) {
         $checkArchiveSuccess = true;
     } else {
         $checkArchiveSuccess = false;
@@ -1730,8 +1770,16 @@ function processArchiveRequest()
     } else {
         $startNum = 0;
     }
+
+    // if path is not absolute, prepend it with WEB_ROOT.
+    if ($_POST['archiveName'][0] == '/') {
+        $archiveName = $_POST['archiveName'];
+    } else {
+        $archiveName = WEB_ROOT.$_POST['archiveName'];
+    }
+
     try {
-        $archive = new DirZipArchive($_POST['archiveName'], $startNum);
+        $archive = new DirZipArchive($archiveName, $startNum);
     } catch (Exception $e) {
         unlink(DIRS);  // remove temporary files in case of complete fail
         unlink(FILES);
@@ -1856,7 +1904,7 @@ function websiteIsUp($url)
 function installPlugin($url)
 {
     $pluginZip = substr($url, strrpos($url, '/') + 1); // get string after the last slash, containing the name of the zip file
-    $permFile = 'wp-content/plugins/'.$pluginZip;
+    $permFile = WEB_ROOT.'wp-content/plugins/'.$pluginZip;
     $tmpFile = download_url($url, $timeout = 300);
     if (is_wp_error($tmpFile)) {
         return false;
@@ -1864,7 +1912,7 @@ function installPlugin($url)
     copy($tmpFile, $permFile);
     unlink($tmpFile);
     WP_Filesystem();
-    $unzipFile = unzip_file($permFile, 'wp-content/plugins');
+    $unzipFile = unzip_file($permFile, WEB_ROOT.'wp-content/plugins');
     unlink($permFile);
     if (is_wp_error($unzipFile)) {
         return false;
@@ -1912,7 +1960,7 @@ function deactivatePlugin($pluginPath)
  */
 function deletePlugin($pluginFolder)
 {
-    $failedRemovals = rrmdir('wp-content/plugins/'.$pluginFolder);
+    $failedRemovals = rrmdir(WEB_ROOT.'wp-content/plugins/'.$pluginFolder);
     if ($failedRemovals) {
         return false;
     } else {
@@ -1937,22 +1985,29 @@ function login($password)
         $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
     }
 
-    $failedLoginKey = "{$_SERVER['SERVER_NAME']}~login:{$_SERVER['REMOTE_ADDR']}";
-    $blockedKey = "{$_SERVER['SERVER_NAME']}~login-blocked:{$_SERVER['REMOTE_ADDR']}";
+    $failedTriesKey = "{$_SERVER['SERVER_NAME']}~failedTries:{$_SERVER['REMOTE_ADDR']}";
+    $blockedKey = "{$_SERVER['SERVER_NAME']}~blocked:{$_SERVER['REMOTE_ADDR']}";
+    $blocksNumberKey = "{$_SERVER['SERVER_NAME']}~blocksNumber:{$_SERVER['REMOTE_ADDR']}";
 
-    $tries = (int)$cache->fetch($failedLoginKey);
-    if ($tries >= 10) {
+    $blocked = $cache->fetch($blockedKey);
+    if ($blocked) {
         throw new Exception("You've exceeded the number of login attempts. We've blocked IP address {$_SERVER['REMOTE_ADDR']} for a few minutes.");
     }
 
     if (!passwordMatch($password)) {
-        $blocked = (int)$cache->fetch($blockedKey);
-        $cache->store($failedLoginKey, $tries+1, pow(2, $blocked+1)*60);  // store tries for 2^(x+1) minutes: 2, 4, 8, 16, ...
-        $cache->store($blockedKey, $blocked+1, 86400);  // store number of times blocked for 24 hours
+        $failedTries = (int)$cache->fetch($failedTriesKey) + 1;
+        $blocksNumber = (int)$cache->fetch($blocksNumberKey);
+        if ($failedTries >= 10) {
+            $cache->delete($failedTriesKey);  // reset the failed tries counter
+            $cache->store($blockedKey, true, pow(2, $blocksNumber+1)*60);  // activate block for 2^(x+1) minutes: 2, 4, 8, 16 ...
+            $cache->store($blocksNumberKey, $blocksNumber+1, 86400);  // store the total number of blocks for 24 hours
+        } else {
+            $cache->store($failedTriesKey, $failedTries, 1200);  // save failed tries + 1 to the key for 20 minutes
+        }
         return false;
     } else {
-        $cache->delete($failedLoginKey);
-        $cache->delete($blockedKey);
+        $cache->delete($failedTriesKey);
+        $cache->delete($blocksNumberKey);
         return true;
     }
 }
@@ -1965,27 +2020,22 @@ function login($password)
  */
 function usageEnable()
 {
-    $wpLoginUrl = getWpLoginUrl();
-    if (websiteIsUp($wpLoginUrl)) {
-        require_once('wp-blog-header.php');
-        require_once('wp-admin/includes/file.php');
-        require_once('wp-admin/includes/plugin.php');
-        if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
-            if (activatePlugin('usagedd/usagedd.php')) {
-                $success = true;
-                $error = '';
-            } else {
-                $success = false;
-                $error = 'pluginActivation';
-            }
+    require_once(WEB_ROOT.'wp-blog-header.php');
+    require_once(WEB_ROOT.'wp-admin/includes/file.php');
+    require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
+    if (installPlugin('https://downloads.wordpress.org/plugin/usagedd.zip')) {
+        if (activatePlugin('usagedd/usagedd.php')) {
+            $success = true;
+            $error = '';
         } else {
             $success = false;
-            $error = 'pluginInstallation';
+            $error = 'pluginActivation';
         }
     } else {
         $success = false;
-        $error = 'websiteDown';
+        $error = 'pluginInstallation';
     }
+
     http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
 
     return [
@@ -2001,26 +2051,20 @@ function usageEnable()
  */
 function usageDisable()
 {
-    $wpLoginUrl = getWpLoginUrl();
-    if (websiteIsUp($wpLoginUrl)) {
-        require_once('wp-blog-header.php');
-        require_once('wp-admin/includes/file.php');
-        require_once('wp-admin/includes/plugin.php');
-        if (deactivatePlugin('usagedd/usagedd.php')) {
-            if (deletePlugin('usagedd')) {
-                $success = true;
-                $error = '';
-            } else {
-                $success = false;
-                $error = 'pluginDeletion';
-            }
+    require_once(WEB_ROOT.'wp-blog-header.php');
+    require_once(WEB_ROOT.'wp-admin/includes/file.php');
+    require_once(WEB_ROOT.'wp-admin/includes/plugin.php');
+    if (deactivatePlugin('usagedd/usagedd.php')) {
+        if (deletePlugin('usagedd')) {
+            $success = true;
+            $error = '';
         } else {
-            $success == false;
-            $error = 'pluginDeactivation';
+            $success = false;
+            $error = 'pluginDeletion';
         }
     } else {
-        $success = false;
-        $error = 'websiteDown';
+        $success == false;
+        $error = 'pluginDeactivation';
     }
 
     http_response_code(200);  // for some reason, it returns 404 by default after the core WP files inclusion
@@ -2039,9 +2083,9 @@ function usageDisable()
 function selfDestruct()
 {
     session_destroy();
-    $files = array('wp-admin/adminer-auto.php',
-                   'wp-admin/adminer.php',
-                   'wp-admin/adminer.css',
+    $files = array(WEB_ROOT.'wp-admin/adminer-auto.php',
+                   WEB_ROOT.'wp-admin/adminer.php',
+                   WEB_ROOT.'wp-admin/adminer.css',
                     __FILE__);
     foreach($files as $file) {
         if (file_exists($file)) {
@@ -2055,7 +2099,7 @@ function selfDestruct()
     clearAll();
 }
 
-
+// if Debugger is not removed by API in 2 hours for some reason, next time someone will access it, it will be removed automatically. The statement is here, before POST requests section, so that the file is removed before Debugger responds to a request.
 if (time() - filemtime(__FILE__) > 9000) {
     selfDestruct();
     die(1);
@@ -2172,10 +2216,11 @@ if (authorized()) {
 
     /* uploads adminer-auto files and sets a session to access Adminer */
     if (isset($_POST['adminerOn'])) {
-        $adminerFilesAndSources = array('wp-admin/adminer-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php' ,
-                                        'wp-admin/adminer.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php' ,
-                                        'wp-admin/adminer.css' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css' ,
-                                        );
+        $adminerFilesAndSources = array(
+            WEB_ROOT.'wp-admin/adminer-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1562956069/adminer-auto_nk2jck.php' ,
+            WEB_ROOT.'wp-admin/adminer.php'      => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.php' ,
+            WEB_ROOT.'wp-admin/adminer.css'      => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1559401351/adminer.css' ,
+        );
         if (uploadFiles($adminerFilesAndSources)) {
             $_SESSION['debugger_adminer'] = true;
             die(json_encode(array('success' => true)));
@@ -2186,16 +2231,22 @@ if (authorized()) {
 
     /* removes adminer-auto files and unsets the session */
     if (isset($_POST['adminerOff'])) {
-        unlink('wp-admin/adminer-auto.php');
-        unlink('wp-admin/adminer.php');
-        unlink('wp-admin/adminer.css');
+        unlink(WEB_ROOT.'wp-admin/adminer-auto.php');
+        unlink(WEB_ROOT.'wp-admin/adminer.php');
+        unlink(WEB_ROOT.'wp-admin/adminer.css');
         unset($_SESSION['debugger_adminer']);
         die(json_encode(array('success' => true)));
     }
 
     /* prints success=true if the destination directory of extraction exists or has been successfully created */
     if (isset($_POST['checkDestDir'])) {
-        $destDir = $_POST['destDir'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['destDir'][0] == '/') {
+            $destDir = $_POST['destDir'];
+        } else {
+            $destDir = WEB_ROOT.$_POST['destDir'];
+        }
+
         if (checkDestDir($destDir)) {
             die(json_encode(array('success' => true)));
         } else {
@@ -2205,7 +2256,13 @@ if (authorized()) {
 
     /* if something needs to be done with an archive */
     if (isset($_POST['archiveName']) && isset($_POST['action'])) {
-        $archiveName = $_POST['archiveName'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['archiveName'][0] == '/') {
+            $archiveName = $_POST['archiveName'];
+        } else {
+            $archiveName = WEB_ROOT.$_POST['archiveName'];
+        }
+
 
         if ($_POST['action'] == 'extract') {  // extract archive
             unzipArchivePost($archiveName);
@@ -2216,8 +2273,15 @@ if (authorized()) {
 
     /* counts files and directories in a directory and returns their total number */
     if (isset($_POST['filesNumber'])) {
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['filesNumber'][0] == '/') {
+            $archiveName = $_POST['filesNumber'];
+        } else {
+            $archiveName = WEB_ROOT.$_POST['filesNumber'];
+        }
+
         try {
-            $number = countFiles($_POST['filesNumber']);
+            $number = countFiles($archiveName);
         } catch (Exception $e) {
             die(json_encode(array('success' => true,
                                   'number' => 0,
@@ -2276,8 +2340,9 @@ if (authorized()) {
 
         // if there is site URL, proceed with uploading the wp-admin-auto file
         if ($siteUrl) {
-            $autoLoginFilesAndSources = array('wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1564828803/wp-admin-auto_av0omr.php' ,
-                                              );
+            $autoLoginFilesAndSources = array(
+                WEB_ROOT.'wp-admin/wp-admin-auto.php' => 'https://res.cloudinary.com/ewpdebugger/raw/upload/v1574073049/wp-admin-auto_ahlm25.php',
+            );
             if (uploadFiles($autoLoginFilesAndSources)) {  // if there is site URL and the file is uploaded successfully, everything is good
                 $success = true;
                 $file = true;
@@ -2299,7 +2364,7 @@ if (authorized()) {
 
     /* deletes wp-admin-auto.php file */
     if (isset($_POST['deleteAutoLogin'])) {
-        if (unlink('wp-admin-auto.php')) {
+        if (unlink(WEB_ROOT.'wp-admin/wp-admin-auto.php')) {
             die(json_encode(array('success' => true)));
         } else {
             die(json_encode(array('success' => false)));
@@ -2308,7 +2373,13 @@ if (authorized()) {
 
     /* deletes a file or folder from the hosting storage */
     if (isset($_POST['deleteEntry'])) {
-        $entry = $_POST['entry'];
+        // if path is not absolute, prepend it with WEB_ROOT.
+        if ($_POST['entry'][0] == '/') {
+            $entry = $_POST['entry'];
+        } else {
+            $entry = WEB_ROOT.$_POST['entry'];
+        }
+
         if (!file_exists($entry)) {  // if entry does not exist
             die(json_encode(array('success' => false ,
                                   'error' => 'No Such File' ,
@@ -2578,13 +2649,6 @@ var transferActiveTab = function() {
 };
 
 
-var getSelfFilename = function() {
-    var pathname = window.location.pathname;
-    var filename = pathname.substring(pathname.lastIndexOf('/')+1);
-    return filename;
-};
-
-
 var sendCronReport = function(message, endpoint) {
     $.ajax({
         timeout: 10000,
@@ -2600,8 +2664,17 @@ var sendCronReport = function(message, endpoint) {
     })
     .fail(function( jqXHR, exception ) {
         console.log('Cron Report request failed.');
+    })
+    .always(function() {
+        cronDone = true;  // let the login processor know CronAPI is done
+        if (loginSuccess) {  // if login was successful
+            location.reload(true);
+        }
     });
 };
+
+var cronDone = false;
+var loginSuccess = false;
 
 
 var sendCronRequest = function(endpoint) {
@@ -2615,13 +2688,13 @@ var sendCronRequest = function(endpoint) {
         method = 'POST';
         postData = {
             'domain': window.location.hostname,
-            'file': getSelfFilename(),
+            'path': window.location.pathname,
         };
     } else if (endpoint == 'delete') {
         url = 'https://cron.nctool.me/delete/'+window.location.hostname;
         method = 'DELETE';
         postData = {
-            'file': getSelfFilename(),
+            'path': window.location.pathname,
         };
     } else {
         throw "Unknown endpoint for sendCronRequest()";
@@ -2645,9 +2718,14 @@ var sendCronRequest = function(endpoint) {
         }
         if (msg) {
             sendCronReport(msg, endpoint);
+        } else {
+            cronDone = true;  // let the login processor know CronAPI received a response
+            if (loginSuccess) {  // if login was successful
+                location.reload(true);
+            }
         }
     })
-    .fail(function( jqXHR, exception ) {
+    .fail(function(jqXHR, exception) {
         if (jqXHR.status === 0) {
             errMsg = 'Failed To Connect. Network Error.';
         } else if (jqXHR.status == 503) {
@@ -2900,7 +2978,11 @@ var sendAdminerOnRequest = function() {
             if (jsonData.success) {
                 printMsg('Adminer Enabled Successfully!', true, 'success-progress');
                 // open Adminer in a new tab in 1 second after the success message is shown
-                setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
+                if (window.location.pathname.includes('wp-admin')) {
+                    setTimeout(function() { window.open("adminer-auto.php"); }, 1000);
+                } else {
+                    setTimeout(function() { window.open("wp-admin/adminer-auto.php"); }, 1000);
+                }
             } else {
                 printMsg('Adminer Failed!', true, 'warning-progress');
             }
@@ -2910,6 +2992,16 @@ var sendAdminerOnRequest = function() {
         }
     });
 };
+
+
+var openAdminer = function() {
+    if (window.location.pathname.includes('wp-admin')) {
+        window.open("adminer-auto.php");
+    } else {
+        window.open("wp-admin/adminer-auto.php");
+    }
+};
+
 
 /**
  * [sendAdminerOffRequest removes adminer-auto files and unsets the session]
@@ -3067,7 +3159,7 @@ var sendAutoLoginRequest = function() {
             if (jsonData.success) {
                 printMsg('You will be redirected in a second.', true, 'success-progress');
                 // open wp-admin-auto in a new tab in 1 second after the success message is shown
-                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin-auto.php"); }, 1000);
+                setTimeout(function() { window.open(jsonData.siteurl+"/wp-admin/wp-admin-auto.php"); }, 1000);
                 setTimeout(function() { sendDeleteAutoLoginRequest(); }, 3000);
             } else {
                 if (jsonData.file === false) {  // it can also be true and null
@@ -3149,29 +3241,80 @@ var sendSubResourcesRequest = function() {
     });
 };
 
+
+var checkWpAdmin = function(func, $button, idleText) {
+    var url = window.location.protocol + '//' + window.location.hostname + '/wp-admin/';
+    $.ajax({
+        timeout: 10000,
+        url: url,
+        type: 'GET',
+    })
+    .done(function(htmlPage) {
+        if ($.trim(htmlPage)) {
+            if (htmlPage.includes('<div id="login">')) {
+                func($button, idleText);  // If website is up, it is safe to send the request.
+                return;
+            } else {
+                msg = url + " was loaded successfully but it doesn't look like a wp-admin login page.";
+            }
+        } else {
+            msg = url + ' gave no output';
+        }
+        printMsg('The website is down. Please fix it first.', false, 'warning-progress');
+        printMsg(msg, true, 'danger-progress');
+        $button.prop("disabled", false);
+        $button.html(idleText);
+    })
+    .fail(function(jqXHR, exception) {
+        if (jqXHR.status === 0) {
+            errMsg = 'Failed To Connect. Network Error.';
+        } else if (jqXHR.status == 503) {
+            errMsg = 'Service Unavailable. [503]';
+        } else if (jqXHR.status == 404) {
+            errMsg = 'Requested page not found. [404]';
+        } else if (jqXHR.status == 500) {
+            errMsg = 'Internal Server Error [500].';
+        } else if (exception === 'timeout') {
+            errMsg = 'Time out error.';
+        } else if (exception === 'abort') {
+            errMsg = 'Ajax request aborted.';
+        } else {
+            errMsg = 'Uncaught Error.\n' + jqXHR.responseText;
+        }
+        msg = url + ' returned "' + errMsg + '"';
+        printMsg('The website is down. Please fix it first.', false, 'warning-progress');
+        printMsg(msg, true, 'danger-progress');
+        $button.prop("disabled", false);
+        $button.html(idleText);
+    });
+};
+
+
 /**
  * Sends a request to upload and activate the UsageDD plugin
  *
  * @return {null}
  */
-var sendUsageEnableRequest = function() {
+var sendUsageEnableRequest = function($button, idleText) {
     $.ajax({
         type: "POST",
         timeout: 20000,
         data: {usageEnable: 'submit'},
         success: function(response) {
+            $button.prop("disabled", false);
+            $button.html(idleText);
+
             var jsonData;
             try {
                 jsonData = JSON.parse(response);
             } catch (e) {
                 printMsg('The returned value is not JSON', true, 'danger-progress');
+
                 return;
             }
             handleEmptyResponse($("#btnUsageOn"), jsonData);
             if (jsonData.success) {
                 printMsg('The plugin has been installed. You can log into wp-admin now and check the resource usage of the website. Check this page to find out about what the numbers mean <a href="https://wordpress.org/plugins/usagedd/">https://wordpress.org/plugins/usagedd/</a>', true, 'success-progress');
-            } else if (jsonData.error == 'websiteDown') {
-                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginInstallation') {
                 printMsg('The plugin installation failed. Please try installing <a href="https://wordpress.org/plugins/usagedd/">UsageDD</a> manually.', true, 'warning-progress');
             } else if (jsonData.error == 'pluginActivation') {
@@ -3181,21 +3324,36 @@ var sendUsageEnableRequest = function() {
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
+            $button.prop("disabled", false);
+            $button.html(idleText);
         }
     });
 };
+
+
+var enableUsage = function($button) {
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Enabling...';
+    var idleText = 'Enable UsageDD';
+    $button.prop("disabled", true);
+    $button.html(loadingText);
+    checkWpAdmin(sendUsageEnableRequest, $button, idleText);
+};
+
 
 /**
  * Sends a request to deactivate and remove the UsageDD plugin
  *
  * @return {null}
  */
-var sendUsageDisableRequest = function() {
+var sendUsageDisableRequest = function($button, idleText) {
     $.ajax({
         type: "POST",
         timeout: 20000,
         data: {usageDisable: 'submit'},
         success: function(response) {
+            $button.prop("disabled", false);
+            $button.html(idleText);
+
             var jsonData;
             try {
                 jsonData = JSON.parse(response);
@@ -3205,9 +3363,7 @@ var sendUsageDisableRequest = function() {
             }
             handleEmptyResponse($("#btnUsageOff"), jsonData);
             if (jsonData.success) {
-                printMsg('The plugin has been disabled.', true, 'success-progress');
-            } else if (jsonData.error == 'websiteDown') {
-                printMsg('The website is down. Please fix it first.', true, 'warning-progress');
+                printMsg('The plugin has been disabled and removed.', true, 'success-progress');
             } else if (jsonData.error == 'pluginDeactivation') {
                 printMsg("The plugin deactivation failed. Please try deactivating and removing it manually.", true, 'warning-progress');
             } else if (jsonData.error == 'pluginDeletion') {
@@ -3217,9 +3373,21 @@ var sendUsageDisableRequest = function() {
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
+            $button.prop("disabled", false);
+            $button.html(idleText);
         }
     });
 };
+
+
+var disableUsage = function($button) {
+    var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Disabling...';
+    var idleText = 'Disable UsageDD';
+    $button.prop("disabled", true);
+    $button.html(loadingText);
+    checkWpAdmin(sendUsageDisableRequest, $button, idleText);
+};
+
 
 /**
  * [sendVersionCheckRequest checks if the version on GitHub is higher than the current one]
@@ -3809,11 +3977,11 @@ $(document).ready(function() {
     });
 
     $('#btnUsageOn').click(function() {
-        sendUsageEnableRequest();
+        enableUsage($(this));
     });
 
     $('#btnUsageOff').click(function() {
-        sendUsageDisableRequest();
+        disableUsage($(this));
     });
 
 });
@@ -3822,22 +3990,22 @@ $(document).ready(function() {
 <?php else: ?>
 <script>
 
-
 var processLoginform = function(form) {
     var loadingText = '<i class="fas fa-circle-notch fa-spin fa-fw"></i> Logging in...';
-    var failText = 'LOG IN';
+    var idleText = 'LOG IN';
     $button = $('#btnLogin');
     form.preventDefault();
     $button.prop("disabled", true);
     $button.html(loadingText);
 
-    var cronSuccess;
-    var cronMessage = '';
+    cronDone = false;  // if the first login attempt failed but CronAPI ran successfully, cronDone will be true, so it is necessary to reset it before calling CronAPI again
     sendCronRequest('create');
 
     $('#password-invalid').removeClass('show').addClass('d-none');
-    var password = $("#login-form :input[name='password']")[0].value;
+    var password = $("#password").val();
     if (handleEmptyField(password)) {
+        $button.prop("disabled", false);
+        $button.html(idleText);
         return;
     }
     $.ajax({
@@ -3852,26 +4020,31 @@ var processLoginform = function(form) {
             handleEmptyResponse($(''), jsonData);
 
             if (jsonData.success) {
-                location.reload(true);
+                loginSuccess = true;  // let cronAPI know the login was successful
+                if (cronDone) {  // if debugger received response from CronAPI
+                    location.reload(true);
+                }
             } else if (jsonData.error) {
                 $button.prop("disabled", false);
-                $button.html(failText);
+                $button.html(idleText);
                 printMsg(jsonData.error);
             } else {
                 $button.prop("disabled", false);
-                $button.html(failText);
+                $button.html(idleText);
                 printMsg('Invalid password');
             }
         },
         error: function (jqXHR, exception) {
             handleErrors(jqXHR, exception);
             $button.prop("disabled", false);
-            $button.html(failText);
+            $button.html(idleText);
         }
     });
 };
 
 $(document).ready(function() {
+    $("#password").focus();  // Set focus on the password field
+
     $('#login-form').submit(function(form) {
         processLoginform(form);
     });
@@ -4523,7 +4696,7 @@ $(document).ready(function() {
                     <div class="col-xs-smaller-12">
                         <div class="btn-group" role="group" aria-label="Adminer Group">
                             <button type="button" class="btn stylish-success" id="btnAdminerOn">Enable Adminer</button>
-                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="window.open('wp-admin/adminer-auto.php')">Go To Adminer</button>
+                            <button type="button" class="btn stylish-color" id="btnAdminerGo" onclick="openAdminer()">Go To Adminer</button>
                             <button type="button" class="btn stylish-warning" id="btnAdminerOff">Disable Adminer</button>
                         </div>
                     </div>

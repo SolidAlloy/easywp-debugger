@@ -3,13 +3,19 @@ from functools import wraps
 
 from app import app
 from flask import jsonify
-import requests
-from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 # Regular experessions used for the validation of input.
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
-file_regex = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9-_() ]{0,30}\.php$')
-job_file_regex = re.compile(r'file=([.a-zA-Z0-9-_() ]+?)"')
+
+# Path must start with slash , then goes an alphanumeric character,
+# then it is possible to use almost all kinds of characters like "(" or "_".
+# It is necessary that the path doesn't exceed a length of 66 characters
+# and ends with .php. Of course, the regex is a bit restrictive as folders
+# can start with "_", but it is already pretty general and more freedom
+# will make the regex even more prone to injections.
+path_regex = re.compile(r'^/[a-zA-Z0-9][a-zA-Z0-9-_()/ ]{0,60}\.php$')
+
+job_path_regex = re.compile(r'path=([.a-zA-Z0-9-_()/ ]+?)"')
 
 
 def catch_custom_exception(func):
@@ -60,11 +66,11 @@ def check_inputs(values_dict):
                 result_dict['domain'] = True
             else:
                 result_dict['domain'] = False
-        if key == 'file':
-            if values_dict[key] and file_regex.fullmatch(values_dict[key]):
-                result_dict['file'] = True
+        if key == 'path':
+            if values_dict[key] and path_regex.fullmatch(values_dict[key]):
+                result_dict['path'] = True
             else:
-                result_dict['file'] = False
+                result_dict['path'] = False
     return result_dict
 
 
@@ -76,34 +82,13 @@ def process_failed_inputs(validated_inputs):
             type_of_input->input_string pairs.
     """
     # If the domain wasn't validated against the regex
-    if not validated_inputs['domain'] and not validated_inputs['file']:
+    if not validated_inputs['domain'] and not validated_inputs['path']:
         success = False
-        message = 'Domain and file are invalid.'
+        message = 'Domain and path are invalid.'
     elif not validated_inputs['domain']:  # If the domain wasn't validated
         success = False
         message = 'The domain is invalid.'
     else:
         success = False
-        message = 'The file is invalid.'
+        message = 'The path is invalid.'
     return [success, message]
-
-
-def check_page(url, timeout=10):
-    try:
-        response = requests.get('http://skanzy.info/wp-admin-shared-status.php', timeout=timeout)
-        if response.status_code == 200:
-            success = True
-            message = response.text
-        else:
-            success = False
-            message = "The link returned " + str(response.status_code) + " status code."
-    except Timeout:
-        success = False
-        message = "Timeout occurred when accessing the link."
-    except TooManyRedirects:
-        success = False
-        message = "There is a redirection loop at the link."
-    except RequestException:
-        success = False
-        message = "Unknown exception occurred when trying to access the link."
-    return success, message
