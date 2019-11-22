@@ -1282,7 +1282,7 @@ function rrmdir($dir, $failedRemovals=[])
     if (is_dir($dir)) {
         $objects = scandir($dir);
         foreach ($objects as $object) {
-            if ($object != "." && $object != "..") {
+            if ($object != "." && $object != ".." && $object != basename(__FILE__)) {
                 if (is_dir($dir.DS.$object)) {
                     $failedRemovalsChild = rrmdir($dir.DS.$object, $failedRemovals);
                     if ($failedRemovalsChild) {
