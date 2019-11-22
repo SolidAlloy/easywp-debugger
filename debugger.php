@@ -1139,9 +1139,9 @@ class DirZipArchive
 function sendMail($emailBody, $endpoint)
 {
     $domain = $_SERVER['HTTP_HOST'];
-    $file = basename(__FILE__);
+    $pathToFile = $_SERVER["REQUEST_URI"];
     $subject = 'Debugger: error accessing endpoint /'.$endpoint;
-    $emailBody = "Reporter: ".$domain.'/'.$file."\n".$emailBody;
+    $emailBody = "Reporter: ".$domain.$pathToFile."\n"."Debugger Version: ".VERSION."\n".$emailBody;
     $headers = "X-Mailer: PHP/".phpversion();
     if (mail(MAIL_RECIPIENT, $subject, $emailBody, $headers)) {
         return true;
