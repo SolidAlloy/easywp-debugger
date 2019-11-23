@@ -662,7 +662,7 @@ class DBconn {
     public function __construct()
     {
         $this->db_details = $this->get_db_login();  // get db details from wp-config.php
-        if (!$this->db_details) {  // in case of fail, return empty instance (with $connected = fail)
+        if (!$this->db_details) {  // in case of fail, return empty instance (with $connected = false)
             return;
         }
         $this->mysqlConn = new mysqli($this->db_details['host'],
@@ -684,8 +684,9 @@ class DBconn {
     }
 
     /**
-     * [getVarnishDetails gets values necessary to build Varnish purge request]
-     * @return array [Varnish parameters]
+     * Get values necessary to build Varnish purge request
+     * 
+     * @return array    Varnish parameters
      */
     public function getVarnishDetails()
     {
@@ -709,8 +710,9 @@ class DBconn {
     }
 
     /**
-     * [getHomeUrl is a replacement for home_url() function needed for the VarnishCache class]
-     * @return string [WordPress home URL]
+     * Replacement for home_url() function needed for the VarnishCache class
+     * 
+     * @return string    WordPress home URL
      */
     public function getHomeUrl()
     {
@@ -729,8 +731,9 @@ class DBconn {
     }
 
     /**
-     * [get_db_login returns an array of db login details and db prefix]
-     * @return array [DB details]
+     * Get an array of db login details and db prefix.
+     * 
+     * @return array    DB details
      */
     private function get_db_login()
     {
@@ -775,9 +778,10 @@ class DBconn {
     }
 
     /**
-     * [activateTheme sets a WordPress theme in the database]
-     * @param  string $theme [name of the theme]
-     * @return boolean       [success of the activation]
+     * Set a WordPress theme in the database.
+     * 
+     * @param  string $theme    Name of the theme
+     * @return boolean          Success of the activation
      */
     public function activateTheme($theme)
     {
@@ -794,8 +798,9 @@ class DBconn {
     }
 
     /**
-     * [getSiteUrl returns website URL from the database]
-     * @return string [website URL]
+     * Get website URL from the database.
+     * 
+     * @return string    Website URL
      */
     public function getSiteUrl()
     {
@@ -811,7 +816,6 @@ class DBconn {
             return '';
         }
     }
-
 }
 
 /**
@@ -834,8 +838,9 @@ class VarnishCache
     }
 
     /**
-     * [getServiceName returns name of the cluster pod]
-     * @return string [name of the cluster pod]
+     * Get the name of the cluster pod.
+     * 
+     * @return string    Name of the cluster pod
      */
     private function getServiceName()
     {
@@ -858,8 +863,9 @@ class VarnishCache
     }
 
     /**
-     * [collectMultipleReplicas returns hosts to purge Varnish cache from]
-     * @return array [hosts to purge Varnish cache from]
+     * Get hosts to purge Varnish cache from.
+     * 
+     * @return array    Hosts to purge Varnish cache from
      */
     private function collectMultipleReplicas(): array
     {
@@ -880,10 +886,11 @@ class VarnishCache
     }
 
     /**
-     * [purgeUrl send request to a host to purge Varnish cache from it]
-     * @param  string $url    [the host to purge Varnish cache from]
-     * @param  string $schema ["http://" or "https://"]
-     * @return boolean        [success of the purge request]
+     * Send request to a host to purge Varnish cache from it.
+     * 
+     * @param  string  $url      The host to purge Varnish cache from
+     * @param  string  $schema   "http://" or "https://"
+     * @return boolean           Success of the purge request
      */
     private function purgeUrl ($url, $schema=null)
     {
@@ -979,8 +986,8 @@ class VarnishCache
     }
 
     /**
-     * [clearAll Purges all Varnish caches of the website and returns an array
-     * of true/false for each Varnish URL]
+     * Purge all Varnish caches of the website and return an array of true/false for each Varnish URL.
+     * 
      * @return null
      */
     public function clearAll()
@@ -1023,10 +1030,11 @@ class FileCounter
     }
 
     /**
-     * [countFiles puts the list of files and directories inside certain directory in a TXT files and returns the total number of files and directories]
-     * @param  string  $directory [path to the directory where files need to be counted]
-     * @param  boolean $silent    [do not throw Exception if silent]
-     * @return integer            [number of files and directories]
+     * Put the list of files and directories inside certain directory in a TXT files and return the total number of files and directories.
+     * 
+     * @param  string  $directory    Path to the directory where files need to be counted
+     * @param  boolean $silent       Do not throw Exception if silent
+     * @return integer               Number of files and directories
      */
     public function countFiles($directory, $silent=false)
     {
@@ -1083,7 +1091,7 @@ class DirZipArchive
     }
 
     /**
-     * [addDirs adds directories from dirs.txt to the archive]
+     * Add directories from dirs.txt to the archive.
      */
     public function addDirs()
     {
@@ -1096,7 +1104,7 @@ class DirZipArchive
     }
 
     /**
-     * [addFilesChunk adds files from files.txt to the archive until the size limit is reached]
+     * Add files from files.txt to the archive until the size limit is reached.
      */
     public function addFilesChunk()
     {
@@ -1130,7 +1138,7 @@ class DirZipArchive
 
 
 /**
- * Sends an email from the default server mailbox to a recipient defined at the start of the file
+ * Send an email from the default server mailbox to a recipient defined at the start of the file.
  *
  * @param  string $emailBody Body of the email
  * @param  string $endpoint  Endpoint of the easywp-cron API
@@ -1186,8 +1194,9 @@ function flushRedis()
 }
 
 /**
- * [clearAll clears OPcache, Redis, and Varnish caches]
- * @return array [success of purging and errors if any]
+ * Clear OPcache, Redis, and Varnish caches.
+ * 
+ * @return array    Success of purging and errors if any
  */
 function clearAll()
 {
@@ -1199,8 +1208,6 @@ function clearAll()
                     ));
     }
 
-    $redis_success = flushRedis() ? 1 : 0;
-
     $varnish_cache = new VarnishCache();
     $varnish_results = $varnish_cache->clearAll();
     // Set to false if any element of array is false, otherwise true
@@ -1208,15 +1215,16 @@ function clearAll()
 
     flushOPcache();
 
-    return array('redis_success' => $redis_success,
+    return array('redis_success' => flushRedis(),
                  'varnish_success' => $varnish_success,
                  'easywp' => true,
                  'errors' => $varnish_cache->errors);
 }
 
 /**
- * [wpConfigClear removes display_errors and debug mode if found in wp-config.php]
- * @return boolean [success of removing debug from wp-config.php]
+ * Remove display_errors and debug mode if found in wp-config.php
+ * 
+ * @return boolean    Success of removing debug from wp-config.php
  */
 function wpConfigClear()
 {
@@ -1233,8 +1241,9 @@ function wpConfigClear()
 }
 
 /**
- * [wpConfigPut enables debug and display_errors in wp-config.php]
- * @return boolean [success of enabling debug]
+ * Enable debug and display_errors in wp-config.php
+ * 
+ * @return boolean    Success of enabling debug
  */
 function wpConfigPut()
 {
@@ -1249,9 +1258,10 @@ function wpConfigPut()
 }
 
 /**
- * [rmove moves folders and files recursively]
- * @param  string $src [object to move]
- * @param  string $dst [destination folder]
+ * Move folders and files recursively
+ * 
+ * @param  string $src    Object to move
+ * @param  string $dst    Destination folder
  * @return null
  */
 function rmove($src, $dst)
@@ -1272,10 +1282,10 @@ function rmove($src, $dst)
 }
 
 /**
- * [rrmdir removes folders and files recursively]
- * @param  string $dir [directory where files must be removed]
- * @param  array $failedRemovals [array of files and folders that failed to be removed]
- * @return array [array of files and folders that failed to be removed]
+ * Remove folders and files recursively
+ * @param  string $dir              Directory where files must be removed
+ * @param  array  $failedRemovals   Array of files and folders that failed to be removed
+ * @return array                    Array of files and folders that failed to be removed
  */
 function rrmdir($dir, $failedRemovals=[])
 {
@@ -1303,11 +1313,12 @@ function rrmdir($dir, $failedRemovals=[])
 }
 
 /**
- * [extractZipFromUrl uploads an archive, extracts it, and removes the zip file]
- * @param  string $url         [URL to download the archive from]
- * @param  string $path        [path to put the archive to]
- * @param  string $archiveName [name of the archive]
- * @return boolean             [success of the extraction]
+ * Upload an archive, extract it, and remove the zip file.
+ * 
+ * @param  string $url           URL to download the archive from
+ * @param  string $path          Path to put the archive to
+ * @param  string $archiveName   Name of the archive
+ * @return boolean               Success of the extraction
  */
 function extractZipFromUrl($url, $path, $archiveName)
 {
@@ -1330,8 +1341,9 @@ function extractZipFromUrl($url, $path, $archiveName)
 }
 
 /**
- * [replaceDefaultFiles replaces default WordPress files with the ones from the latest version]
- * @return boolean [success of the replacement]
+ * Replace default WordPress files with the ones from the latest version.
+ * 
+ * @return boolean    Success of the replacement
  */
 function replaceDefaultFiles()
 {
@@ -1347,10 +1359,11 @@ function replaceDefaultFiles()
 }
 
 /**
- * [themeExists checks if the theme folder exists in wp-content/themes]
- * @param  string $themesPath [path to the themes folder]
- * @param  string $themeName  [theme name]
- * @return boolean            [theme exists]
+ * Check if the theme folder exists in wp-content/themes.
+ * 
+ * @param  string $themesPath    Path to the themes folder
+ * @param  string $themeName     Theme name
+ * @return boolean               Theme exists
  */
 function themeExists($themesPath, $themeName)
 {
@@ -1363,8 +1376,9 @@ function themeExists($themesPath, $themeName)
 }
 
 /**
- * [findLatest2019 gets version number of the latest 2019 theme]
- * @return string [version number]
+ * Get version number of the latest 2019 theme.
+ * 
+ * @return string    Version number
  */
 function findLatest2019()
 {
@@ -1383,8 +1397,9 @@ function findLatest2019()
 }
 
 /**
- * [replace2019 replaces files of the 2019 theme or uploads files if the folder doesn't exist]
- * @return boolean [success of the replacement]
+ * Replace files of the 2019 theme or upload files if the folder doesn't exist.
+ * 
+ * @return boolean    Success of the replacement.
  */
 function replace2019()
 {
@@ -1407,8 +1422,8 @@ function replace2019()
 }
 
 /**
- * [activate2019 activates the twentynineteen theme in database]
- * @return boolean [success of the activation]
+ * Activate the twentynineteen theme in database.
+ * @return boolean    Success of the activation.
  */
 function activate2019()
 {
@@ -1424,8 +1439,9 @@ function activate2019()
 }
 
 /**
- * [createEasyWpSymLink creates the mu-plugins symlink or does nothing if the link already exists]
- * @return boolean [success of the symlink creation]
+ * Create the mu-plugins symlink or do nothing if the link already exists.
+ * 
+ * @return boolean    Success of the symlink creation
  */
 function createEasyWpSymLink()
 {
@@ -1442,8 +1458,9 @@ function createEasyWpSymLink()
 }
 
 /**
- * [createObjectCache creates object-cache.php if missing]
- * @return boolean [success of the file creation]
+ * Create object-cache.php if missing.
+ * 
+ * @return boolean    Success of the file creation.
  */
 function createObjectCache()
 {
@@ -1468,8 +1485,8 @@ function createObjectCache()
 }
 
 /**
- * [statAllFiles runs stat on all files/folders in path]
- * @param  string $dir [path to folder]
+ * Run stat() on all files/folders in a path.
+ * @param  string $dir    Path to folder
  * @return null
  */
 function statAllFiles($dir)
@@ -1490,8 +1507,17 @@ function statAllFiles($dir)
 
 
 /**
- * [uploadAdminerFiles uploads files from URLs to storage]
- * @return boolean [success of the upload]
+ * Upload files from URLs to storage.
+ * 
+ * @return boolean    Success of the upload
+ */
+
+
+/**
+ * Upload files from URLs to storage.
+ * 
+ * @param  array $filesAndSources    Dictionary of file=>link pairs
+ * @return boolean                   Success of the upload
  */
 function uploadFiles($filesAndSources) {
     $results = array();
@@ -1512,13 +1538,13 @@ function uploadFiles($filesAndSources) {
 }
 
 /**
- * [unzipArchive extracts a zip archive in chunks. Returns true on completion and last
- *     extracted file if the allowed time is exceeded]
- * @param  string $archiveName [path to the zip file]
- * @param  string $destDir     [destination directory]
- * @param  integer $startNum    [filenumber to start extraction from]
- * @return boolean|array             [true on extraction completion; array
- *                                containing number and name of the failed file on fail]
+ * Extract a zip archive in chunks. Returns true on completion and last extracted file if the allowed time is exceeded.
+ * 
+ * @param  string   $archiveName   Path to the zip file
+ * @param  string   $destDir       Destination directory
+ * @param  integer  $startNum      Filenumber to start extraction from
+ * @return boolean|array           True on extraction completion or
+ *                                     array containing number and name of the failed file on fail
  */
 function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 {
@@ -1540,7 +1566,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
         $name = zip_entry_name($entry);
         $size = zip_entry_filesize($entry);
 
-        if (substr($name, -1) == '/') { // if directory
+        if (substr($name, -1) == '/') {  // if directory
             $dir = $destDir.DS.$name;
             if (is_dir($dir)) {  // if destination directory exists
                 // pass
@@ -1550,7 +1576,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
             } else {  // if the destination entry doesn't exist
                 mkdir($dir);
             }
-        } else { // if file
+        } else {  // if file
             $unzipped = fopen($destDir.DS.$name,'wb');
             while($size > 0){
 
@@ -1574,9 +1600,10 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 }
 
 /**
- * [viewArchive returns pathnames of all the files inside an archive]
- * @param  string $archiveName [path to zip file]
- * @return array              [pathnames of files inside an archive]
+ * Get pathnames of all the files inside an archive.
+ * 
+ * @param  string $archiveName    Path to zip file
+ * @return array                  Paths to the files inside the archive
  */
 function viewArchive($archiveName)
 {
@@ -1594,9 +1621,10 @@ function viewArchive($archiveName)
 }
 
 /**
- * [checkDestDir checks if a directory exists and is writable. If no, it creates the directory]
- * @param  [type] $destDir [description]
- * @return [type]          [description]
+ * Check if a directory exists and is writable. If no, create the directory.
+ * 
+ * @param  string $destDir   Path to the destination directory.
+ * @return bool              Success if the directory is writable.
  */
 function checkDestDir($destDir)
 {
@@ -1617,9 +1645,10 @@ function checkDestDir($destDir)
 }
 
 /**
- * [countFiles returns number of files and folders inside an archive]
- * @param  string $archiveName  [path to zip file]
- * @return integer              [number of files in zip file]
+ * Get number of files and folders inside an archive.
+ * 
+ * @param  string $archiveName  Path to zip file.
+ * @return integer              Number of files in zip file.
  */
 function countFiles($archiveName)
 {
@@ -1639,8 +1668,9 @@ function countFiles($archiveName)
 }
 
 /**
- * [unzipArchivePost wrapper for unzipArchive that returns its result as json array]
- * @param  string $archiveName [path to zip file]
+ * Wrapper for unzipArchive that returns its result as json array.
+ * 
+ * @param  string $archiveName    Path to zip file.
  * @return null
  */
 function unzipArchivePost($archiveName)
@@ -1680,8 +1710,9 @@ function unzipArchivePost($archiveName)
 }
 
 /**
- * [viewArchivePost wrapper for viewArchive that returns its result as json array]
- * @param  string $archiveName [path to zip file]
+ * Wrapper for viewArchive that returns its result as json array.
+ * 
+ * @param  string $archiveName    Path to zip file.
  * @return null
  */
 function viewArchivePost($archiveName)
@@ -1699,9 +1730,10 @@ function viewArchivePost($archiveName)
 }
 
 /**
- * [checkArchive checks if the archive the user wants to create already exists]
- * @param  string $archiveName [archive name]
- * @return boolean             [returns true if such a name is free]
+ * Check if the archive the user wants to create already exists.
+ * 
+ * @param  string $archiveName    Archive name.
+ * @return boolean                True if such a name is free.
  */
 function checkArchive($archiveName)
 {
@@ -1713,8 +1745,9 @@ function checkArchive($archiveName)
 }
 
 /**
- * [processPreCheckRequest checks if the directory can be compressed and returns json with the result]
- * @return string [json-encoded array with the result of pre-check]
+ * Check if the directory can be compressed and return json with the result.
+ * 
+ * @return string    json-encoded array with the result of pre-check.
  */
 function processPreCheckRequest()
 {
@@ -1759,9 +1792,9 @@ function processPreCheckRequest()
 }
 
 /**
- * [processArchiveRequest compresses the directory using input from the POST form and returns
- *  a json-encoded array with the result]
- * @return string [json-encoded result]
+ * Compress the directory using input from the POST form and return a json-encoded array with the result.
+ * 
+ * @return string    json-encoded result.
  */
 function processArchiveRequest()
 {
@@ -1810,8 +1843,9 @@ function processArchiveRequest()
 }
 
 /**
- * [getVersionUrl retrieves a link to the last version of Debugger from GitHub]
- * @return string [link to the latest GitHub release of Debugger]
+ * Retrieve a link to the last version of Debugger from GitHub.
+ * 
+ * @return string    Link to the latest GitHub release of Debugger.
  */
 function getVersionUrl()
 {
@@ -1842,8 +1876,9 @@ function getVersionUrl()
 }
 
 /**
- * [checkNewVersion checks if there is a new version of Debugger on GitHub]
- * @return bool ["true" if the version on GitHub is higher than the local one]
+ * Check if there is a new version of Debugger on GitHub.
+ * 
+ * @return bool    "true" if the version on GitHub is higher than the local one.
  */
 function checkNewVersion()
 {
@@ -1857,8 +1892,9 @@ function checkNewVersion()
 }
 
 /**
- * Returns the login URL of the website
- * @return string        URL of the login page
+ * Return the login URL of the website.
+ * 
+ * @return string        URL of the login page.
  */
 function getWpLoginUrl()
 {
@@ -1868,9 +1904,10 @@ function getWpLoginUrl()
 }
 
 /**
- * Checks if the website returns code 200
- * @param  string $url URL to check
- * @return bool        True if the URL returns code 200
+ * Check if the website returns code 200.
+ * 
+ * @param  string $url   URL to check
+ * @return bool          True if the URL returns code 200
  */
 function websiteIsUp($url)
 {
@@ -1897,9 +1934,10 @@ function websiteIsUp($url)
 }
 
 /**
- * Install a plugin given by the URL
- * @param  string $url URL to install the plugin from
- * @return bool        Success of the plugin installation
+ * Install a plugin given by the URL.
+ * 
+ * @param  string $url   URL to install the plugin from
+ * @return bool          Success of the plugin installation
  */
 function installPlugin($url)
 {
@@ -1922,10 +1960,10 @@ function installPlugin($url)
 }
 
 /**
- * Activates a WordPress plugin
+ * Activate a WordPress plugin
  *
- * @param  string $pluginPath Path-to-plugin-folder/path-to-plugin-main-file
- * @return bool               Success of the activation
+ * @param  string $pluginPath   Path-to-plugin-folder/path-to-plugin-main-file
+ * @return bool                 Success of the activation
  */
 function activatePlugin($pluginPath)
 {
@@ -1938,10 +1976,10 @@ function activatePlugin($pluginPath)
 }
 
 /**
- * Deactivates a WordPress plugin
+ * Deactivate a WordPress plugin.
  *
- * @param  string $pluginPath  Path-to-plugin-folder/path-to-plugin-main-file
- * @return bool                Success of the deactivation
+ * @param  string $pluginPath    Path-to-plugin-folder/path-to-plugin-main-file
+ * @return bool                  Success of the deactivation
  */
 function deactivatePlugin($pluginPath)
 {
@@ -1954,9 +1992,10 @@ function deactivatePlugin($pluginPath)
 }
 
 /**
- * Removes a WordPress plugin
- * @param  string $pluginFolder Name of the plugin folder
- * @return bool                 Success of the removal
+ * Remove a WordPress plugin.
+ * 
+ * @param  string $pluginFolder   Name of the plugin folder
+ * @return bool                   Success of the removal
  */
 function deletePlugin($pluginFolder)
 {
@@ -1969,7 +2008,8 @@ function deletePlugin($pluginFolder)
 }
 
 /**
- * login the user if the correct password is entered and rate-limit the connection otherwise
+ * login the user if the correct password is entered and rate-limit the connection otherwise.
+ * 
  * @param  string $password Password to log into debugger
  * @return bool             Success of the login
  */
