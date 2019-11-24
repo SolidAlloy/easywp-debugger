@@ -3291,7 +3291,7 @@ var checkWpAdmin = function(func, $button, idleText) {
     })
     .done(function(htmlPage) {
         if ($.trim(htmlPage)) {
-            if (htmlPage.includes('<div id="login">')) {
+            if ( htmlPage.includes('<title>Log In') || htmlPage.includes('<title>Dashboard') ) {
                 func($button, idleText);  // If website is up, it is safe to send the request.
                 return;
             } else {
