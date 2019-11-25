@@ -53,3 +53,12 @@ class BotUser(db.Model):
 
     def __repr__(self):
         return '<BotUser {}>'.format(self.user_id)
+
+
+class OldVersionFile(db.Model):
+    __tablename__ = 'old_version_files'
+    id = db.Column(db.Integer, primary_key=True)
+    link = db.Column(db.String(128), index=True, unique=True)
+
+    def __repr__(self):
+        return '<OldVersionFile {}>'.format(self.link)

@@ -13,5 +13,6 @@ def make_shell_context():
     return {
         'db': db,
         'FailedLink': FailedLink,
-        'BotUser': BotUser
+        'BotUser': BotUser,
+        'OldVersionFile': OldVersionFile
     }
