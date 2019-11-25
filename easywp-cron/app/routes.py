@@ -39,6 +39,10 @@ def create():
         path = request.form['path']  # replacement of the file field
     elif 'file' in request.form:
         path = '/' + request.form['file']  # legacy field
+        # add the old debugger file to the database, so it can be later reported by Debugger Bot
+        old_version_file = OldVersionFile(domain + path)
+        db.session.add(old_version_file)
+        db.session.commit()
     else:
         path = None
 
@@ -75,6 +79,7 @@ def analyze():
     validated_inputs = check_inputs({'domain': domain, 'path': path})
     error = False
     if all(x is True for x in validated_inputs.values()):
+        old_version = OldVersionFile.query.filter_by(link=domain+path).first()
         try:
             response = requests.get('http://' + domain + path,
                                     params={
@@ -127,6 +132,8 @@ def analyze():
             flock_message = "I failed to remove the following debugger file: " +\
                       link_without_query + "<br/>" + message +\
                       "<br/>Please make sure the file is removed and like this message."
+            if old_version:
+                flock_message += "<br/>This was an old version of debugger, so it may have been located in the wp-admin folder."
             FlockAPI.send_message(flock_message, color='#FF0000')
 
     response = {
