@@ -8,7 +8,7 @@ from app.flock_api import FlockAPI
 from app.functions import (catch_custom_exception, check_inputs,
                            process_failed_inputs)
 from app.job_manager import JobManager
-from app.models import FailedLink
+from app.models import FailedLink, OldVersionFile
 from flask import jsonify, request
 from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
@@ -40,7 +40,7 @@ def create():
     elif 'file' in request.form:
         path = '/' + request.form['file']  # legacy field
         # add the old debugger file to the database, so it can be later reported by Debugger Bot
-        old_version_file = OldVersionFile(domain + path)
+        old_version_file = OldVersionFile(link=domain+path)
         db.session.add(old_version_file)
         db.session.commit()
     else:
@@ -79,7 +79,12 @@ def analyze():
     validated_inputs = check_inputs({'domain': domain, 'path': path})
     error = False
     if all(x is True for x in validated_inputs.values()):
+        # Check if the file is of old version. If so, an additional line
+        # will be added to the message in Flock
         old_version = OldVersionFile.query.filter_by(link=domain+path).first()
+        if old_version:
+            db.session.delete(old_version)
+
         try:
             response = requests.get('http://' + domain + path,
                                     params={
