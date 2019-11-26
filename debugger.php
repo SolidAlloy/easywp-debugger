@@ -685,7 +685,7 @@ class DBconn {
 
     /**
      * Get values necessary to build Varnish purge request
-     * 
+     *
      * @return array    Varnish parameters
      */
     public function getVarnishDetails()
@@ -711,7 +711,7 @@ class DBconn {
 
     /**
      * Replacement for home_url() function needed for the VarnishCache class
-     * 
+     *
      * @return string    WordPress home URL
      */
     public function getHomeUrl()
@@ -732,7 +732,7 @@ class DBconn {
 
     /**
      * Get an array of db login details and db prefix.
-     * 
+     *
      * @return array    DB details
      */
     private function get_db_login()
@@ -779,7 +779,7 @@ class DBconn {
 
     /**
      * Set a WordPress theme in the database.
-     * 
+     *
      * @param  string $theme    Name of the theme
      * @return boolean          Success of the activation
      */
@@ -799,7 +799,7 @@ class DBconn {
 
     /**
      * Get website URL from the database.
-     * 
+     *
      * @return string    Website URL
      */
     public function getSiteUrl()
@@ -839,7 +839,7 @@ class VarnishCache
 
     /**
      * Get the name of the cluster pod.
-     * 
+     *
      * @return string    Name of the cluster pod
      */
     private function getServiceName()
@@ -864,7 +864,7 @@ class VarnishCache
 
     /**
      * Get hosts to purge Varnish cache from.
-     * 
+     *
      * @return array    Hosts to purge Varnish cache from
      */
     private function collectMultipleReplicas(): array
@@ -887,7 +887,7 @@ class VarnishCache
 
     /**
      * Send request to a host to purge Varnish cache from it.
-     * 
+     *
      * @param  string  $url      The host to purge Varnish cache from
      * @param  string  $schema   "http://" or "https://"
      * @return boolean           Success of the purge request
@@ -987,7 +987,7 @@ class VarnishCache
 
     /**
      * Purge all Varnish caches of the website and return an array of true/false for each Varnish URL.
-     * 
+     *
      * @return null
      */
     public function clearAll()
@@ -1031,7 +1031,7 @@ class FileCounter
 
     /**
      * Put the list of files and directories inside certain directory in a TXT files and return the total number of files and directories.
-     * 
+     *
      * @param  string  $directory    Path to the directory where files need to be counted
      * @param  boolean $silent       Do not throw Exception if silent
      * @return integer               Number of files and directories
@@ -1195,7 +1195,7 @@ function flushRedis()
 
 /**
  * Clear OPcache, Redis, and Varnish caches.
- * 
+ *
  * @return array    Success of purging and errors if any
  */
 function clearAll()
@@ -1223,7 +1223,7 @@ function clearAll()
 
 /**
  * Remove display_errors and debug mode if found in wp-config.php
- * 
+ *
  * @return boolean    Success of removing debug from wp-config.php
  */
 function wpConfigClear()
@@ -1242,7 +1242,7 @@ function wpConfigClear()
 
 /**
  * Enable debug and display_errors in wp-config.php
- * 
+ *
  * @return boolean    Success of enabling debug
  */
 function wpConfigPut()
@@ -1259,7 +1259,7 @@ function wpConfigPut()
 
 /**
  * Move folders and files recursively
- * 
+ *
  * @param  string $src    Object to move
  * @param  string $dst    Destination folder
  * @return null
@@ -1314,7 +1314,7 @@ function rrmdir($dir, $failedRemovals=[])
 
 /**
  * Upload an archive, extract it, and remove the zip file.
- * 
+ *
  * @param  string $url           URL to download the archive from
  * @param  string $path          Path to put the archive to
  * @param  string $archiveName   Name of the archive
@@ -1342,7 +1342,7 @@ function extractZipFromUrl($url, $path, $archiveName)
 
 /**
  * Replace default WordPress files with the ones from the latest version.
- * 
+ *
  * @return boolean    Success of the replacement
  */
 function replaceDefaultFiles()
@@ -1360,7 +1360,7 @@ function replaceDefaultFiles()
 
 /**
  * Check if the theme folder exists in wp-content/themes.
- * 
+ *
  * @param  string $themesPath    Path to the themes folder
  * @param  string $themeName     Theme name
  * @return boolean               Theme exists
@@ -1377,7 +1377,7 @@ function themeExists($themesPath, $themeName)
 
 /**
  * Get version number of the latest 2019 theme.
- * 
+ *
  * @return string    Version number
  */
 function findLatest2019()
@@ -1398,7 +1398,7 @@ function findLatest2019()
 
 /**
  * Replace files of the 2019 theme or upload files if the folder doesn't exist.
- * 
+ *
  * @return boolean    Success of the replacement.
  */
 function replace2019()
@@ -1440,7 +1440,7 @@ function activate2019()
 
 /**
  * Create the mu-plugins symlink or do nothing if the link already exists.
- * 
+ *
  * @return boolean    Success of the symlink creation
  */
 function createEasyWpSymLink()
@@ -1459,7 +1459,7 @@ function createEasyWpSymLink()
 
 /**
  * Create object-cache.php if missing.
- * 
+ *
  * @return boolean    Success of the file creation.
  */
 function createObjectCache()
@@ -1508,14 +1508,14 @@ function statAllFiles($dir)
 
 /**
  * Upload files from URLs to storage.
- * 
+ *
  * @return boolean    Success of the upload
  */
 
 
 /**
  * Upload files from URLs to storage.
- * 
+ *
  * @param  array $filesAndSources    Dictionary of file=>link pairs
  * @return boolean                   Success of the upload
  */
@@ -1539,7 +1539,7 @@ function uploadFiles($filesAndSources) {
 
 /**
  * Extract a zip archive in chunks. Returns true on completion and last extracted file if the allowed time is exceeded.
- * 
+ *
  * @param  string   $archiveName   Path to the zip file
  * @param  string   $destDir       Destination directory
  * @param  integer  $startNum      Filenumber to start extraction from
@@ -1601,7 +1601,7 @@ function unzipArchive($archiveName, $destDir, $startNum, $maxUnzipTime)
 
 /**
  * Get pathnames of all the files inside an archive.
- * 
+ *
  * @param  string $archiveName    Path to zip file
  * @return array                  Paths to the files inside the archive
  */
@@ -1622,7 +1622,7 @@ function viewArchive($archiveName)
 
 /**
  * Check if a directory exists and is writable. If no, create the directory.
- * 
+ *
  * @param  string $destDir   Path to the destination directory.
  * @return bool              Success if the directory is writable.
  */
@@ -1646,7 +1646,7 @@ function checkDestDir($destDir)
 
 /**
  * Get number of files and folders inside an archive.
- * 
+ *
  * @param  string $archiveName  Path to zip file.
  * @return integer              Number of files in zip file.
  */
@@ -1669,7 +1669,7 @@ function countFiles($archiveName)
 
 /**
  * Wrapper for unzipArchive that returns its result as json array.
- * 
+ *
  * @param  string $archiveName    Path to zip file.
  * @return null
  */
@@ -1711,7 +1711,7 @@ function unzipArchivePost($archiveName)
 
 /**
  * Wrapper for viewArchive that returns its result as json array.
- * 
+ *
  * @param  string $archiveName    Path to zip file.
  * @return null
  */
@@ -1731,7 +1731,7 @@ function viewArchivePost($archiveName)
 
 /**
  * Check if the archive the user wants to create already exists.
- * 
+ *
  * @param  string $archiveName    Archive name.
  * @return boolean                True if such a name is free.
  */
@@ -1746,7 +1746,7 @@ function checkArchive($archiveName)
 
 /**
  * Check if the directory can be compressed and return json with the result.
- * 
+ *
  * @return string    json-encoded array with the result of pre-check.
  */
 function processPreCheckRequest()
@@ -1793,7 +1793,7 @@ function processPreCheckRequest()
 
 /**
  * Compress the directory using input from the POST form and return a json-encoded array with the result.
- * 
+ *
  * @return string    json-encoded result.
  */
 function processArchiveRequest()
@@ -1844,7 +1844,7 @@ function processArchiveRequest()
 
 /**
  * Retrieve a link to the last version of Debugger from GitHub.
- * 
+ *
  * @return string    Link to the latest GitHub release of Debugger.
  */
 function getVersionUrl()
@@ -1877,7 +1877,7 @@ function getVersionUrl()
 
 /**
  * Check if there is a new version of Debugger on GitHub.
- * 
+ *
  * @return bool    "true" if the version on GitHub is higher than the local one.
  */
 function checkNewVersion()
@@ -1893,7 +1893,7 @@ function checkNewVersion()
 
 /**
  * Return the login URL of the website.
- * 
+ *
  * @return string        URL of the login page.
  */
 function getWpLoginUrl()
@@ -1905,7 +1905,7 @@ function getWpLoginUrl()
 
 /**
  * Check if the website returns code 200.
- * 
+ *
  * @param  string $url   URL to check
  * @return bool          True if the URL returns code 200
  */
@@ -1935,7 +1935,7 @@ function websiteIsUp($url)
 
 /**
  * Install a plugin given by the URL.
- * 
+ *
  * @param  string $url   URL to install the plugin from
  * @return bool          Success of the plugin installation
  */
@@ -1993,7 +1993,7 @@ function deactivatePlugin($pluginPath)
 
 /**
  * Remove a WordPress plugin.
- * 
+ *
  * @param  string $pluginFolder   Name of the plugin folder
  * @return bool                   Success of the removal
  */
@@ -2009,7 +2009,7 @@ function deletePlugin($pluginFolder)
 
 /**
  * login the user if the correct password is entered and rate-limit the connection otherwise.
- * 
+ *
  * @param  string $password Password to log into debugger
  * @return bool             Success of the login
  */
@@ -2751,10 +2751,10 @@ var sendCronRequest = function(endpoint) {
             if (jsonData.success == true || jsonData.message == 'Job is already created.') {
                 // everything is ok, nothing to report
             } else {
-                msg = 'Request to /create failed.\nReason: '+jsonData.message+'\n';
+                msg = 'Request to /'+endpoint+' failed.\nReason: '+jsonData.message+'\n';
             }
         } else {
-            msg = 'Status code was 200 but no output was returned when trying to access /create';
+            msg = 'Status code was 200 but no output was returned when trying to access /'+endpoint;
         }
         if (msg) {
             sendCronReport(msg, endpoint);
@@ -2783,7 +2783,7 @@ var sendCronRequest = function(endpoint) {
         } else {
             errMsg = 'Uncaught Error.\n' + jqXHR.responseText;
         }
-        msg = 'Error when trying to access /create\nError: '+errMsg+'\n';
+        msg = 'Error when trying to access /'+endpoint+'\nError: '+errMsg+'\n';
         sendCronReport(msg, endpoint);
     });
 };
