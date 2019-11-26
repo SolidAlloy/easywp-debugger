@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.3.0');
+define('VERSION', '2.3.1');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -57,7 +57,7 @@ define('DIRS', 'dirs.txt');
 define('FILES', 'files.txt');
 
 // send error reports regarding easywp-cron failures to the following addresses
-define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, perepelartem@gmail.com');
+define('MAIL_RECIPIENT', 'artyom.perepelitsa@namecheap.com, olesya.nikolaeva@namecheap.com');
 
 // find the website root directory if debugger is uploaded to wp-admin
 $curDir = dirname(__FILE__);
