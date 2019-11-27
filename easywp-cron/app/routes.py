@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime, timedelta
 
-import requests
 from app import app, db
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
 from app.functions import (catch_custom_exception, check_inputs,
-                           process_failed_inputs)
+                           process_failed_inputs, send_self_destruct_request)
 from app.job_manager import JobManager
 from app.models import FailedLink, OldVersionFile
 from flask import jsonify, request
-from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 
 @app.route('/', methods=['GET'])
@@ -40,9 +38,11 @@ def create():
     elif 'file' in request.form:
         path = '/' + request.form['file']  # legacy field
         # add the old debugger file to the database, so it can be later reported by Debugger Bot
-        old_version_file = OldVersionFile(link=domain+path)
-        db.session.add(old_version_file)
-        db.session.commit()
+        old_version = OldVersionFile.query.filter_by(link=domain+path).first()
+        if not old_version:
+            old_version_file = OldVersionFile(link=domain+path)
+            db.session.add(old_version_file)
+            db.session.commit()
     else:
         path = None
 
@@ -79,47 +79,25 @@ def analyze():
     validated_inputs = check_inputs({'domain': domain, 'path': path})
     error = False
     if all(x is True for x in validated_inputs.values()):
-        # Check if the file is of old version. If so, an additional line
-        # will be added to the message in Flock
+        # Check if the file is of an old version. If so, an additional
+        # line will be added to the message in Flock.
         old_version = OldVersionFile.query.filter_by(link=domain+path).first()
         if old_version:
             db.session.delete(old_version)
 
-        try:
-            response = requests.get('http://' + domain + path,
-                                    params={
-                                        'selfDestruct': '1',
-                                        'silent': '1',
-                                    })
-            if response.status_code == 200:
-                if response.json() == {'success': True}:
-                    success = True
-                    message = "The file was removed successfully."
-                else:
-                    success = False
-                    error = 'no output'
-                    message = "Link responded with 200 but didn't return any JSON."
-            elif response.status_code == 404:
-                success = True
-                message = "The file has already been removed."
-            else:
-                success = False
-                error = str(response.status_code)
-                message = "The link returned " + error + " status code."
-        except Timeout:
-            success = False
-            error = 'timeout'
-            message = "Timeout occurred when accessing the link."
-        except TooManyRedirects:
-            success = False
-            error = 'too many redirects'
-            message = "There is a redirection loop at the link."
-        except RequestException:
-            success = False
-            error = 'unknown'
-            message = "Unknown exception occurred when trying to access the link."
+        # Try removing debugger file at domain.com/path_to_debugger.
+        # Since old versions of debugger submit only filename and not
+        # the path, it is necessary to check the wp-admin/debugger.php
+        # path as well.
+        success, error, message, response = send_self_destruct_request(domain, path)
+        app.info_logger.info('error: ')
+        if (error == '403' or error == 'unknown') and old_version:
+            success, error, message, response = send_self_destruct_request(
+                domain, '/wp-admin'+path)
+
     else:  # if no domain or the domain wasn't validated against the regex
         success, message = process_failed_inputs(validated_inputs)
+        error = False
 
     if not success:
         try:
