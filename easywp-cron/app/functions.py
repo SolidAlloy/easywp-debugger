@@ -1,8 +1,11 @@
 import re
 from functools import wraps
+from json import JSONDecodeError
 
+import requests
 from app import app
 from flask import jsonify
+from requests.exceptions import RequestException, Timeout, TooManyRedirects
 
 # Regular experessions used for the validation of input.
 domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-9-_]*[a-zA-Z0-9]+$')
@@ -92,3 +95,57 @@ def process_failed_inputs(validated_inputs):
         success = False
         message = 'The path is invalid.'
     return [success, message]
+
+
+def send_self_destruct_request(domain, path):
+    """Try removing debugger file and check the removal was successful
+
+    Send GET request to http://domain.com/debugger.php?selfDestruct=1
+    and check if response was 200 or 404. If the response was different,
+    return an error that will be reported.
+
+    Arguments:
+        domain {string} -- Domain to send the removal request to
+        path {string} -- Path to a debugger file that starts with slash.
+    """
+    error = False
+    try:
+        response = requests.get('http://' + domain + path,
+                                params={
+                                    'selfDestruct': '1',
+                                    'silent': '1',
+                                })
+        if response.status_code == 200:
+            try:
+                json_data = response.json()
+                if json_data == {'success': True}:
+                    success = True
+                    message = "The file was removed successfully."
+                else:
+                    success = False
+                    error = 'no output'
+                    message = "Link responded with 200 but didn't return any JSON."
+            except JSONDecodeError:
+                success = False
+                error = 'json error'
+                message = "Response was 200 but JSON failed to be decoded."
+        elif response.status_code == 404:
+            success = True
+            message = "The file has already been removed."
+        else:
+            success = False
+            error = str(response.status_code)
+            message = "The link returned " + error + " status code."
+    except Timeout:
+        success = False
+        error = 'timeout'
+        message = "Timeout occurred when accessing the link."
+    except TooManyRedirects:
+        success = False
+        error = 'too many redirects'
+        message = "There is a redirection loop at the link."
+    except RequestException:
+        success = False
+        error = 'unknown'
+        message = "Unknown exception occurred when trying to access the link."
+    return (success, error, message, response)
