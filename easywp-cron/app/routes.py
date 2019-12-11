@@ -115,8 +115,6 @@ def analyze():
             flock_message = "I failed to remove the following debugger file: " +\
                       link_without_query + "<br/>" + message +\
                       "<br/>Please make sure the file is removed and like this message."
-            if old_version:
-                flock_message += "<br/>This was an old version of debugger, so it may have been located in the wp-admin folder."
             FlockAPI.send_message(flock_message, color='#FF0000')
 
     response = {
