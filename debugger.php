@@ -19,7 +19,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.3.1');
+define('VERSION', '2.3.2');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -255,11 +255,8 @@ class Redis_Object_Cache
                     }
                     $predis = $plugin_dir . '/wp-nc-easywp/plugin/Http/Redis/includes/predis.php';
                     if (!file_exists($predis)) {
-                        die(json_encode(array(
-                            'redis_success' => false,
-                            'varnish_success' => false,
-                            'errors' => array('Failed to find Redis. Are you using Debugger on EasyWP? Try fixing the EasyWP plugin.')
-                        )));
+                        $this->redis_connected = false;
+                        return;
                     }
                     require_once $plugin_dir . '/wp-nc-easywp/plugin/Http/Redis/includes/predis.php';
                     Predis\Autoloader::register();
@@ -1217,21 +1214,29 @@ function clearAll()
         return array('redis_success' => false,
                      'varnish_success' => false,
                      'easywp' => false,
-                     'errors' => array("It is not EasyWP, is it?",
-                    ));
+                     'errors' => array("It is not EasyWP, is it?",)
+                    );
     }
 
     $varnish_cache = new VarnishCache();
     $varnish_results = $varnish_cache->clearAll();
     // Set to false if any element of array is false, otherwise true
-    $varnish_success = in_array(false, $varnish_results, true) ? 0 : 1;
+    $varnish_success = in_array(false, $varnish_results, true) ? false : true;
+    $errors = $varnish_cache->errors;
+
+    try {
+        $redis_success = flushRedis();
+    } catch (Exception $e) {
+        $redis_success = false;
+        array_push($errors, 'Failed to find Redis. Are you using Debugger on EasyWP? Try fixing the EasyWP plugin.');
+    }
 
     flushOPcache();
 
-    return array('redis_success' => flushRedis(),
+    return array('redis_success' => $redis_success,
                  'varnish_success' => $varnish_success,
                  'easywp' => true,
-                 'errors' => $varnish_cache->errors);
+                 'errors' => $errors);
 }
 
 /**
@@ -2031,7 +2036,7 @@ function login($password)
     try {
         $cache = new EasyWP_Cache();
     } catch (Exception $e) {
-        throw new Exception("Both Redis and APCu do not work on this hosting. Login restricted.");
+        throw new Exception("Neither Redis nor APCu work on this hosting. Login restricted.");
     }
 
     if ($cache->getHandler() == 'redis') {
