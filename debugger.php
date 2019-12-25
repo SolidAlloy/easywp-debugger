@@ -877,7 +877,7 @@ class VarnishCache
      *
      * @return array    Hosts to purge Varnish cache from
      */
-    private function collectMultipleReplicas(): array
+    private function collectMultipleReplicas()
     {
         $svc = $this->getServiceName();
         if ($svc) {
@@ -930,14 +930,14 @@ class VarnishCache
             $varnishIp = $dbData['varnishIp'] ?: '127.0.0.1';
 
             // path
-            $path = $parsedUrl['path']??'';
+            $path = isset($parsedUrl['path']) ? $parsedUrl['path'] : '';
 
             // setting host
             $hostHeader = $parsedUrl['host'];
             $podname    = getenv('HOSTNAME');
             $host       = $hostHeader;
             if (empty($podname)) {
-                $host = $varnishIp??$hostHeader;
+                $host = isset($varnishIp) ? $varnishIp : $hostHeader;
             }
 
             if (isset($parsedUrl['port'])) {
@@ -1021,7 +1021,7 @@ class VarnishCache
  */
 class FileCounter
 {
-    protected const SIZE_LIMIT = 52428800;  // 50 MB
+    const SIZE_LIMIT = 52428800;  // 50 MB
     protected $ignoreList;
     protected $directory;
 
@@ -1080,7 +1080,7 @@ class DirZipArchive
     protected $startNum;
     protected $zip;
     protected $counter = 0;
-    protected const SIZE_LIMIT = 52428800;  // 50 MB
+    const SIZE_LIMIT = 52428800;  // 50 MB
     protected $totalSize = 0;
     protected $dirs;
     protected $files;
@@ -2472,7 +2472,7 @@ if (authorized()) {
 
     /* returns the name of the pod */
     if (isset($_POST['getPodName'])) {
-        $podName = getenv('HOSTNAME') ?? '';
+        $podName = getenv('HOSTNAME') ? getenv('HOSTNAME') : '';
         die(json_encode(array('podName' => $podName)));
     }
 
