@@ -89,10 +89,10 @@ def analyze():
         # Since old versions of debugger submit only filename and not
         # the path, it is necessary to check the wp-admin/debugger.php
         # path as well.
-        success, error, message, response = send_self_destruct_request(domain, path)
+        success, error, message = send_self_destruct_request(domain, path)
         app.info_logger.info('error: ')
         if (error == '403' or error == 'unknown') and old_version:
-            success, error, message, response = send_self_destruct_request(
+            success, error, message = send_self_destruct_request(
                 domain, '/wp-admin'+path)
 
     else:  # if no domain or the domain wasn't validated against the regex
@@ -100,20 +100,17 @@ def analyze():
         error = False
 
     if not success:
-        try:
-            link_without_query = response.url.split('?')[0]
-        except UnboundLocalError:  # response variable was not defined because of exception
-            link_without_query = 'http://' + domain + path
+        link = 'http://' + domain + path
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'email':
             failed_link = FailedLink(
-                link=link_without_query, error=error, message=message)
+                link=link, error=error, message=message)
             db.session.add(failed_link)
             db.session.commit()
         if app.config['FAILED_URL_HANDLER'] == 'all' or \
                 app.config['FAILED_URL_HANDLER'] == 'bot':
             flock_message = "I failed to remove the following debugger file: " +\
-                      link_without_query + "<br/>" + message +\
+                      link + "<br/>" + message +\
                       "<br/>Please make sure the file is removed and like this message."
             FlockAPI.send_message(flock_message, color='#FF0000')
 

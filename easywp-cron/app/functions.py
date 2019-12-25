@@ -1,6 +1,5 @@
 import re
 from functools import wraps
-from json import JSONDecodeError
 
 import requests
 from app import app
@@ -112,23 +111,11 @@ def send_self_destruct_request(domain, path):
     try:
         response = requests.get('http://' + domain + path,
                                 params={
-                                    'selfDestruct': '1',
-                                    'silent': '1',
+                                    'selfDestruct': '1'
                                 })
-        if response.status_code == 200:
-            try:
-                json_data = response.json()
-                if json_data == {'success': True}:
-                    success = True
-                    message = "The file was removed successfully."
-                else:
-                    success = False
-                    error = 'no output'
-                    message = "Link responded with 200 but didn't return any JSON."
-            except JSONDecodeError:
-                success = False
-                error = 'json error'
-                message = "Response was 200 but JSON failed to be decoded."
+        if response.status_code == 200 or response.status_code == 302 or response.status_code == 301:
+            success = True
+            message = "The file was removed successfully."
         elif response.status_code == 404:
             success = True
             message = "The file has already been removed."
@@ -148,4 +135,4 @@ def send_self_destruct_request(domain, path):
         success = False
         error = 'unknown'
         message = "Unknown exception occurred when trying to access the link."
-    return (success, error, message, response)
+    return (success, error, message)
