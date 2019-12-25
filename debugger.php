@@ -671,8 +671,10 @@ class DBconn {
                                       $this->db_details['name']);
         if ($this->mysqlConn->connect_errno) {
             array_push($this->errors, "<strong>Database connection failed:</strong> " . $this->mysqlConn->connect_error);
-        } else {
+        } elseif ($this->checkConnection()) {
             $this->connected = true;
+        } else {
+            array_push($this->errors, "<strong>Database connection failed:</strong> The database is corrupted or the prefix in wp-config.php doesn't match.");
         }
     }
 
@@ -774,6 +776,17 @@ class DBconn {
             return $db_details;
         } else {
             array_push($this->errors, "<strong>Database connection failed:</strong> Table prefix was not found in wp-config.php");
+        }
+    }
+
+    private function checkConnection()
+    {
+        $home_query = "SELECT * FROM `" . $this->db_details['prefix'] . "options` WHERE `option_name` LIKE 'home'";
+        $result = $this->mysqlConn->query($home_query);
+        if ($result) {
+            return true;
+        } else {
+            return false;
         }
     }
 
