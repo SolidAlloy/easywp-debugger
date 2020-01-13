@@ -13,13 +13,15 @@
  */
 
 
+ini_set('display_errors', 0);  // PHP messages mustn't be inserted in AJAX responses.
+
 session_start();
 
 /*
     !!! Constants section !!!
 */
 
-define('VERSION', '2.3.2');
+define('VERSION', '2.3.3');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -1317,10 +1319,12 @@ function rrmdir($dir, $failedRemovals=[])
                         array_push($failedRemovals, $failedRemovalsChild); // add new failed removals to the existing ones
                     }
                 } else {
-                    if (!unlink($dir.DS.$object)) {
+                    if (!unlink($dir.DS.$object)) {  // if the file failed to be removed, add it to the list of failed removals
                         array_push($failedRemovals, $dir.DS.$object);
                     }
                 }
+            } elseif ($object == basename(__FILE__)) {  // if it is debugger.php, don't remove it and add to the list of failed removals
+                array_push($failedRemovals, $dir.DS.$object);
             }
         }
         if (!rmdir($dir)) {
