@@ -2,9 +2,14 @@ EasyWP Debugger
 ===============================================
 
 
+EasyWP Debugger is a helper file that you can upload to the website root directory and open in a browser. It allows to debug and fix websites that otherwise would be impossible to fix (because of no access to file storage or database). It is built to help with websites hosted on [EasyWP](https://www.namecheap.com/wordpress/), but you can use it on other platforms as well.
+
+There is a debugger file generator called debugger-generator.php. It allows to download debugger files with a random name (_wp-admin-pretrxs_, _wp-admin-thwdsa,_ etc.) and password. In this guide, we use **debugger.php** as an **example**.
+
+ 
 
 Table of Contents
-=================
+-----------------
 
    * **[Introduction](#introduction)**
    * **[How To Use](#how-to-use)**
@@ -26,14 +31,7 @@ Table of Contents
    * **[How to fix file system](#how-to-fix-file-system)**
    * **[Repository structure and API](#repository-structure-and-api)**
 
-# Introduction
 
-
-EasyWP Debugger is a helper file that you can upload to the website root directory and open in a browser. It allows to debug and fix websites that otherwise would be impossible to fix (because of no access to file storage or database). It is built to help with websites hosted on [EasyWP](https://www.namecheap.com/wordpress/), but you can use it on other platforms as well.
-
-There is a debugger file generator called debugger-generator.php. It allows to download debugger files with a random name (_wp-admin-pretrxs_, _wp-admin-thwdsa,_ etc.) and password. In this guide, we use **debugger.php** as an **example**.
-
-  
 
 # How To Use
 
