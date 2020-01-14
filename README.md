@@ -76,10 +76,10 @@ When you finish work in the Debugger, don't forget to remove it with the **Remov
 This tab is dedicated to the websites hosted on EasyWP and allows you to:
 
 *   **Flush Cache** flushes Varnish and Redis caches. Both caches have to be cleared for the website to show new content. It is especially useful if you just fixed an error (changed theme, disabled plugin) but the website doesn't go up;
-*   **Fix Filesystem** is rather outdated button. It was useful when EasyWP had frequent filesystem issues. Cases, when the issue can be connected to the filesystem errors, are described [in this section](#how-to-fix-filesystem);
-*   **Fix EasyWP Plugin** is used to fix the issues related to the EasyWP plugin: not working **WP Admin** button or absence of the **Clear Cache** button. More info on these cases [are described here](#unable-to-log-into-wp-admin-missing-clear-cache-button);
+*   **Fix Filesystem** is rather outdated button. It was useful when EasyWP had frequent filesystem issues. Cases, when the issue can be connected to the filesystem errors, are described [in this section](#how-to-fix-file-system);
+*   **Fix EasyWP Plugin** is used to fix the issues related to the EasyWP plugin: not working **WP Admin** button or absence of the **Clear Cache** button. More info on these cases [are described here](#unable-to-log-into-wp-admin--missing-clear-cache-button);
 *   **Subscription Resources** is there for EasyWP customer support to check subscription resources usage and can't be used by anyone else;
-*   **Enable/Disable UsageDD** simply installs and removes the UsageDD plugin. UsageDD allows you to find the possible reason for high resources usage refer to the "[502/503/504 errors](#502-503-504-errors)" section. The plugin can be installed from within WP Admin dashboard too.
+*   **Enable/Disable UsageDD** simply installs and removes the UsageDD plugin. UsageDD allows you to find the possible reason for high resources usage refer to the "[502/503/504 errors](#502503504-errors)" section. The plugin can be installed from within WP Admin dashboard too.
 
 ![](https://raw.githubusercontent.com/SolidAlloy/easywp-debugger/master/readme-images/212327770.png)
 
@@ -191,7 +191,7 @@ This error can be also fixed by disabling the theme/plugin which causes it (make
 
 These errors mean that the website exceeded some hardware limits like CPU or RAM. Many reasons may cause this issue: a poorly optimized website, heavy theme or plugin, number of visitors, or a DDoS attack, etc.
 
-If the website is returning the error intermittently, you can go to **Debugger** >> **EasyWP** tab >> press the **Enable UsageDD** button to install this plugin [https://wordpress.org/plugins/usagedd/](https://wordpress.org/plugins/usagedd/) (alternatively, install the plugin through the Wordpress admin dashboard).
+If the website is returning the error intermittently, you can go to **Debugger** >> **EasyWP** tab >> press the **Enable UsageDD** button to install [this plugin](https://wordpress.org/plugins/usagedd/) (alternatively, install the plugin through the Wordpress admin dashboard).
 
 We recommend that you read the description of the plugin at the link above to know how to debug the website with it, but here is a short list of things to check:
 
@@ -209,7 +209,7 @@ Unable to log into WP Admin / Missing Clear Cache button
 
 Sometimes, it is not possible to log into the Wordpress Dashboard via the **Log in** Button in EasyWP dashboard. In such a case follow the next steps:
 
-1.  Check the **siteurl** and **home** values in the database. If they contain www version of the website, change the website URL to non-www. If you want the website to work on a www version, contact EasyWP customer support.
+1.  Check the **siteurl** and **home** values in the database. If they contain www version of the website, change the website URL to non-www . If you want the website to work on a www version, contact EasyWP customer support.
 2.  If the website is already using a non-www URL, press **Fix EasyWP Plugin** in **EasyWP** tab of the Debugger.
 
 If there is a missing **Clear Cache** button in the wp-admin dashboard of an EasyWP-hosted website, the reason for this is the missing EasyWP plugin. Install it with the **Fix EasyWP Plugin** button in **EasyWP** tab of the Debugger.
