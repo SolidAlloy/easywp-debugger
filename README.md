@@ -256,7 +256,7 @@ If the website is hacked/infected, the least you can do is replace default files
 
    ![](https://raw.githubusercontent.com/SolidAlloy/easywp-debugger/master/readme-images/212327763.png)  
 
-2. Remove all the files in the root directory except for **wp-config.php** and **wp-admin-debugger.php** (it is easier to do through the FTP access).  
+2. Remove all the files in the root directory except for **wp-config.php** and **debugger.php** (it is easier to do through the FTP access).  
 
 3. Check that **wp-config.php** does not contain any malicious code. Remove the malicious code from it if needed.  
 
