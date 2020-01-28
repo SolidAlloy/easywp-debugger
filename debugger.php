@@ -2201,7 +2201,7 @@ if (isset($_POST['cronReport'])) {
 /* removes debugger.php and additional files from the server, disables debug. Doesn't require login */
 if (isset($_POST['selfDestruct']) || isset($_GET['selfDestruct'])) {
     selfDestruct();
-    die(json_encode(array('success' => true)));
+    die('The file was removed successfully.');
 }
 
 // if the Debugger session is created, process POST requests
