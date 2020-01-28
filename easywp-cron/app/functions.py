@@ -15,7 +15,7 @@ domain_regex = re.compile(r'^([a-zA-Z0-9][a-zA-Z0-9-_]*\.)*[a-zA-Z0-9]*[a-zA-Z0-
 # and ends with .php. Of course, the regex is a bit restrictive as folders
 # can start with "_", but it is already pretty general and more freedom
 # will make the regex even more prone to injections.
-path_regex = re.compile(r'^/[a-zA-Z0-9/][.a-zA-Z0-9-_()/ ]{0,60}\.php$')
+path_regex = re.compile(r'^/[a-zA-Z0-9/][.a-zA-Z0-9-_()/% ]{0,60}\.php$')
 
 job_path_regex = re.compile(r'path=([.a-zA-Z0-9-_()/ ]+?)"')
 
