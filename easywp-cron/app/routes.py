@@ -111,7 +111,8 @@ def analyze():
                 app.config['FAILED_URL_HANDLER'] == 'bot':
             flock_message = "I failed to remove the following debugger file: " +\
                       link + "<br/>" + message +\
-                      "<br/>Please make sure the file is removed and like this message."
+                      '<br/>Please try removing it via this <a href="' + link +\
+                      '?selfDestruct">link</a> or delete it manually, and like this message.'
             FlockAPI.send_message(flock_message, color='#FF0000')
 
     response = {
