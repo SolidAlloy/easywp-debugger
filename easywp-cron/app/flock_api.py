@@ -28,12 +28,12 @@ class FlockAPI:
         bot_token {str} -- Token of the bot.
         flock_base_url {str} -- Flock base API URL
     """
-    admin_user_id = 'moved to .env'
-    admin_user_token = 'moved to .env'
-    test_channel_id = 'moved to .env'
-    sme_channel_id = 'moved to .env'
-    bot_id = 'moved to .env'
-    bot_token = 'moved to .env'
+    admin_user_id = app.config['ADMIN_FLOCK_ID']
+    admin_user_token = app.config['ADMIN_FLOCK_TOKEN']
+    test_channel_id = app.config['TEST_CHANNEL_ID']
+    sme_channel_id = app.config['SME_CHANNEL_ID']
+    bot_id = app.config['BOT_ID']
+    bot_token = app.config['BOT_TOKEN']
     flock_base_url = 'https://api.flock.co/v1/'
 
     def send_request(method, endpoint, payload):

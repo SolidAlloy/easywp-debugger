@@ -77,3 +77,10 @@ class Config(object):
     FAILED_URL_HANDLER = os.environ.get('FAILED_URL_HANDLER') or 'all'
     MAX_QUEUE_LENGTH = int(os.environ.get('MAX_QUEUE_LENGTH') or 240)
     TIME_TO_DELETE = os.environ.get('TIME_TO_DELETE') or '2 hours'
+
+    ADMIN_FLOCK_ID = os.environ.get('ADMIN_FLOCK_ID')
+    ADMIN_FLOCK_TOKEN = os.environ.get('ADMIN_FLOCK_TOKEN')
+    TEST_CHANNEL_ID = os.environ.get('TEST_CHANNEL_ID')
+    SME_CHANNEL_ID = os.environ.get('SME_CHANNEL_ID')
+    BOT_ID = os.environ.get('BOT_ID')
+    BOT_TOKEN = os.environ.get('BOT_TOKEN')

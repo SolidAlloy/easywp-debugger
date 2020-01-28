@@ -4544,7 +4544,7 @@ $(document).ready(function() {
     <?php else: ?>
         <title>Debugger Login</title>
     <?php endif; ?>
-    <meta charset="utf-8">
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAKkSURBVGhD7dhLyE1RGMbxz/1S7rmXIilFmTAwURiYUVJMDEwoSSGJfDMjJQkDSibKJTKQwsRAkaTESK4ZKSXkkvv/HexavT1nn7X2WeuU7Kd+s7XX2m9nn/2utQfatGnT5r/IMEwqYBz6mgP4U8BXzEFfMgMfoW4kh3PoS05B3UAuv7EMRbMYP6FuIKc7GIJiuQG1cAnrUSRroBYs5RlGIWuG4wnUgiXtQtZshVqo8gPPa7yHuq4bu24KsmQ83kItVHmNbhmDVTiBL1DzKEeRJYegFgjFFBJmJi5AzeV9xwL0FOuy1m3VAqHUQqrE7hCuoqdYl1UTe76QkZgXmI5OOQI1p7cCjWLd1bqsmtTzhVjj9GNeYT9GI4xtQB/Cj/ceYCiSY91VTajEFFK5j8kIE9ujNiMp1lXVRJ2kFGKuw+cl1NjQG4xFVKybWldVE3WSWohZiTDHoMZ5BxEV66ZqgjpNCjmOMNugxnmfYEeJ2tgJrUkXblKIbUDDrIMap5xEbWzrfBfq4jpNCrmMMJugxilb0DVLEfvarTQpZB/C7IEa5z1C9Gv4LNQknaQW8hmzEca6txrrrUZ0ZsH+VGoiJbWQ7Qhj/82YjeQ1JCflS0lsIXazvgjLINT4kB0VFiI5tpV4ATWp5wuZi1uBK7D/hH+cLPMR81Wm65uqLhugJvV8IbGZgJiT5wdMRU+5DTV5qEkh9qs9hprP24ueswS/oBaopBRiJ0V7zGIbr+2a/Y65cU5DLVKxo7C9FjuxR3Qn7FSY+pVyI7JlGuw5VQuVdA/ZP9TthlqsFNtdLEf22Pb+KdSiJVxCsayFWjS3b7CzftHchFo8p8MonkWw7YK6gRzeYSL6EjvdqZvIYQf6Fvseex4XMzuDEWjTpk2bNv9CBgb+Ah5CpqHklKu9AAAAAElFTkSuQmCC" rel="icon" type="image/x-icon" />
 </head>
