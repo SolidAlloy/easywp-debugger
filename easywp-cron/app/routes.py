@@ -5,7 +5,7 @@ from app import app, db
 from app.email import send_failed_links_email
 from app.flock_api import FlockAPI
 from app.functions import (catch_custom_exception, check_inputs,
-                           process_failed_inputs, send_self_destruct_request)
+                           process_failed_inputs, send_self_destruct_request, check_404_on_debugger)
 from app.job_manager import JobManager
 from app.models import FailedLink, OldVersionFile
 from flask import jsonify, request
@@ -90,7 +90,11 @@ def analyze():
         # the path, it is necessary to check the wp-admin/debugger.php
         # path as well.
         success, error, message = send_self_destruct_request(domain, path)
-        app.info_logger.info('error: ')
+        if not success:
+            success = check_404_on_debugger(domain, path)
+            if success:
+                message = 'Debugger returned error when trying to be removed, ' +\
+                    'but was removed successfully.'
         if (error == '403' or error == 'unknown') and old_version:
             success, error, message = send_self_destruct_request(
                 domain, '/wp-admin'+path)

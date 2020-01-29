@@ -136,3 +136,18 @@ def send_self_destruct_request(domain, path):
         error = 'unknown'
         message = "Unknown exception occurred when trying to access the link."
     return (success, error, message)
+
+
+def check_404_on_debugger(domain, path):
+    try:
+        response = requests.get('http://' + domain + path)
+        if response.status_code == 404:
+            return True
+        else:
+            return False
+    except Timeout:
+        return False
+    except TooManyRedirects:
+        return False
+    except RequestException:
+        return False
