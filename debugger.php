@@ -2138,6 +2138,23 @@ function usageDisable()
 }
 
 /**
+ * Returns the EasyWP storage the website is hosted on.
+ *
+ * @return string EasyWP storage
+ */
+function getStorage() {
+    $domain = $_SERVER['HTTP_HOST'];
+    $ip = gethostbyname($domain);
+    $hostname = gethostbyaddr($ip);
+
+    if ($hostname == 'easywp.com') {
+        return 'legacy';
+    } else {
+        return 'island';
+    }
+}
+
+/**
  * Removes all the additional files and itself
  *
  * @return null
@@ -2475,9 +2492,13 @@ if (authorized()) {
     }
 
     /* returns the name of the pod */
-    if (isset($_POST['getPodName'])) {
+    if (isset($_POST['getSubDetails'])) {
         $podName = getenv('HOSTNAME') ? getenv('HOSTNAME') : '';
-        die(json_encode(array('podName' => $podName)));
+        $storage = getStorage();
+        die(json_encode(array(
+            'podName' => $podName,
+            'storage' => $storage,
+        )));
     }
 
     /* installs and activates the UsageDD plugin */
@@ -3280,7 +3301,7 @@ var sendSubResourcesRequest = function() {
     $.ajax({
         type: "POST",
         timeout: 20000,
-        data: {getPodName: 'submit'},
+        data: {getSubDetails: 'submit'},
         success: function(response) {
             var jsonData;
             try {
@@ -3290,9 +3311,15 @@ var sendSubResourcesRequest = function() {
                 return;
             }
             handleEmptyResponse($("#btnSubResources"), jsonData);
-            if (jsonData.podName) {
+            if (jsonData.podName && jsonData.storage) {
                 printMsg('You will be redirected in a second.', true, 'success-progress');
-                setTimeout(function() { window.open("https://grafana.namecheapcloud.net/d/gr00yHhWk/pods?orgId=1&var-namespace=default&var-pod="+jsonData.podName); }, 1000);
+                // The storage can be either legacy or island
+                if (jsonData.storage == 'legacy') {
+                    grafanaUrl = 'https://grafana.namecheapcloud.net/d/gr00yHhWk';
+                } else {
+                    grafanaUrl = 'https://grafana.production-island01.namecheapcloud.net/d/kitTvxPWk';
+                }
+                setTimeout(function() { window.open(grafanaUrl + "/pods?orgId=1&var-namespace=default&var-pod="+jsonData.podName); }, 1000);
             } else {
                 printMsg('Fail. The the pod name was not found.', true, 'warning-progress');
             }
