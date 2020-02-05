@@ -21,7 +21,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.3.4');
+define('VERSION', '2.3.5');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -3279,12 +3279,7 @@ var sendSelfDestructRequest = function() {
         },
         success: function(response) {
             var jsonData;
-            try {
-                jsonData = JSON.parse(response);
-            } catch (e) {
-                printMsg('The returned value is not JSON', true, 'danger-progress');
-                return;
-            }
+            // do not check jsonData for content because it does not return JSON-encoded response for now.
             handleEmptyResponse($(".btnSelfDestruct"), jsonData);
         },
         error: function (jqXHR, exception) {
