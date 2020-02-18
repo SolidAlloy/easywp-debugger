@@ -182,6 +182,11 @@ class FlockAPI:
         Arguments:
             json_request {dict} -- JSON string as a dictionary object.
         """
+        if not json_request:
+            return {
+                'status': 'ok',
+            }
+        
         if json_request['name'] == 'app.install':
             bot_user = BotUser(user_id=json_request['userId'],
                                token=json_request['token'])
