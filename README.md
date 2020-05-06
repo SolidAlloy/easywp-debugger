@@ -40,7 +40,7 @@ There are two ways to get a debugger file:
 1. Download directly from GitHub.
 2. Get using the debugger generator script.
 
-If you use the first method, I recommend that you change the password at the end of the file right away (the PASSWORD constant).
+If you use the first method, I recommend that you change the password at the start of the file right away (the PASSWORD constant).
 
 
 
