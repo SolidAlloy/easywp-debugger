@@ -21,7 +21,7 @@ session_start();
     !!! Constants section !!!
 */
 
-define('VERSION', '2.3.6');
+define('VERSION', '2.3.7');
 
 // Change it to a more secure password.
 define('PASSWORD', 'notsoeasywp');
@@ -2767,14 +2767,14 @@ var sendCronRequest = function(endpoint) {
     var msg = '';
 
     if (endpoint == 'create') {
-        url = 'https://cron.nctool.me/create';
+        url = 'http://cron.nctool.me/create';
         method = 'POST';
         postData = {
             'domain': window.location.hostname,
             'path': window.location.pathname,
         };
     } else if (endpoint == 'delete') {
-        url = 'https://cron.nctool.me/delete/'+window.location.hostname;
+        url = 'http://cron.nctool.me/delete/'+window.location.hostname;
         method = 'DELETE';
         postData = {
             'path': window.location.pathname,
